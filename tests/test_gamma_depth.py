@@ -8,6 +8,7 @@ import requests_mock as requests_mock_lib
 from corva.configuration import SETTINGS as CORVA_SETTINGS
 from pytest_mock import MockerFixture
 
+from lambda_function import lambda_handler
 from src.configuration import SETTINGS
 from src.gamma_depth import get_drillstrings
 from lambda_function import lambda_handler
@@ -72,11 +73,31 @@ def test_records_with_no_drillstring_are_filtered(mocker: MockerFixture):
                  timestamp=0,
                  version=SETTINGS.version
              )
-        )
+        ),
+        (
+             '[{"records": [{"timestamp": 0, "asset_id": 0, "company_id": 0, "version": 0, "collection": "", '
+             '"data": {"bit_depth": 1.0, "gamma_ray": 2}, "metadata": {"drillstring": "0"}}], '
+             '"metadata": {"app_stream_id": 0, "apps": {"%s": {"app_connection_id": 0, "app_version": 0}}}, '
+             '"asset_id": 0}]' % CORVA_SETTINGS.APP_KEY,
+             '[]',
+             ActualGammaDepth(
+                 asset_id=0,
+                 collection=SETTINGS.collection,
+                 company_id=0,
+                 data=ActualGammaDepthData(
+                     gamma_depth=1.0,
+                     bit_depth=1.0,
+                     gamma_ray=2
+                 ),
+                 provider=SETTINGS.provider,
+                 timestamp=0,
+                 version=SETTINGS.version
+             )
+        ),
     ],
-    ids=['no_mwd_with_gamma_sensor', 'mwd_with_gamma_sensor']
+    ids=['no_mwd_with_gamma_sensor', 'mwd_with_gamma_sensor', 'missing_drillstring_data_from_api']
 )
-def test_gamma_depth(event, text, expected, requests_mock):
+def test_gamma_depth(event, text, expected, requests_mock: requests_mock_lib.Mocker):
     get_mock = requests_mock.get(
         urljoin(
             CORVA_SETTINGS.DATA_API_ROOT_URL,
