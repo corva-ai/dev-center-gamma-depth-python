@@ -1,6 +1,6 @@
 import itertools
 import json
-from typing import List
+from typing import Dict, List
 
 import pydantic
 from corva import Api, Cache, StreamEvent
@@ -51,17 +51,18 @@ def gamma_depth(event: StreamEvent, api: Api, cache: Cache):
     id_to_drillstring = {
         drillstring.id: drillstring
         for drillstring in drillstrings
-    }
+    }  # type: Dict[str, Drillstring]
 
     actual_gamma_depths = []
     for record in event.records:  # build actual gamma depth for each record
-        drillstring = id_to_drillstring[record.metadata.drillstring_id]  # type: Drillstring
+        gamma_depth_val = record.data.bit_depth
 
-        gamma_depth_val = (
-            record.data.bit_depth - drillstring.mwd_with_gamma_sensor.gamma_sensor_to_bit_distance
-            if drillstring.mwd_with_gamma_sensor
-            else record.data.bit_depth
-        )
+        if (
+             (drillstring := id_to_drillstring.get(record.metadata.drillstring_id))
+             and
+             drillstring.mwd_with_gamma_sensor
+        ):
+            gamma_depth_val = record.data.bit_depth - drillstring.mwd_with_gamma_sensor.gamma_sensor_to_bit_distance
 
         actual_gamma_depths.append(
             ActualGammaDepth(
