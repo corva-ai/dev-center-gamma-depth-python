@@ -11,11 +11,12 @@ from pytest_mock import MockerFixture
 from lambda_function import lambda_handler
 from src.configuration import SETTINGS
 from src.gamma_depth import get_drillstrings
-from lambda_function import lambda_handler
 from src.models import ActualGammaDepth, ActualGammaDepthData, GammaDepthEvent
 
 
 def test_records_with_no_drillstring_are_filtered(mocker: MockerFixture):
+    """tests, that record with no drillstring is deleted and func returns early, as no records left."""
+
     event = (
                 '[{"records": [{"timestamp": 0, "asset_id": 0, "company_id": 0, "version": 0, "collection": "", '
                 '"data": {"bit_depth": 0.0, "gamma_ray": 0}, "metadata": {}}], "metadata": '
@@ -132,7 +133,9 @@ def test_gamma_depth(event, text, expected, requests_mock: requests_mock_lib.Moc
     assert actual_gamma_depths[0] == expected
 
 
-def test_get_drillstrings_gathers_all_data(mocker: MockerFixture, requests_mock):
+def test_get_drillstrings_gathers_all_data(mocker: MockerFixture, requests_mock: requests_mock_lib.Mocker):
+    """tests, that all drillstrings received from the api, in case there is more drillstrings, than api limit"""
+
     event = (
                 '[{"records": [{"timestamp": 0, "asset_id": 0, "company_id": 0, "version": 0, "collection": "", '
                 '"data": {"bit_depth": 0.0, "gamma_ray": 0}, "metadata": {"drillstring": 0}}, {"timestamp": 0, '
