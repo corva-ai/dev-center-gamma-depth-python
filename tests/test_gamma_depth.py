@@ -42,7 +42,7 @@ def test_records_with_no_drillstring_are_filtered(mocker: MockerFixture):
              '[{"_id": "0", "data": {"components": []}}]',
              ActualGammaDepth(
                  asset_id=0,
-                 collection=SETTINGS.collection,
+                 collection=SETTINGS.actual_gamma_depth_collection,
                  company_id=0,
                  data=ActualGammaDepthData(
                      gamma_depth=1.0,
@@ -63,7 +63,7 @@ def test_records_with_no_drillstring_are_filtered(mocker: MockerFixture):
              '"gamma_sensor_to_bit_distance": 1.0}]}}]',
              ActualGammaDepth(
                  asset_id=0,
-                 collection=SETTINGS.collection,
+                 collection=SETTINGS.actual_gamma_depth_collection,
                  company_id=0,
                  data=ActualGammaDepthData(
                      gamma_depth=0.0,
@@ -83,7 +83,7 @@ def test_records_with_no_drillstring_are_filtered(mocker: MockerFixture):
              '[]',
              ActualGammaDepth(
                  asset_id=0,
-                 collection=SETTINGS.collection,
+                 collection=SETTINGS.actual_gamma_depth_collection,
                  company_id=0,
                  data=ActualGammaDepthData(
                      gamma_depth=1.0,
@@ -102,14 +102,17 @@ def test_gamma_depth(event, text, expected, requests_mock: requests_mock_lib.Moc
     get_mock = requests_mock.get(
         urljoin(
             CORVA_SETTINGS.DATA_API_ROOT_URL,
-            'api/v1/data/corva/data.drillstring?%s'
-            % urlencode({
-                'query': '{"asset_id": 0, "_id": {"$in": ["0"]}}',
-                'sort': '{"timestamp": 1}',
-                'limit': 100,
-                'skip': 0,
-                'fields': '_id,data'
-            })
+            'api/v1/data/corva/%s?%s'
+            % (
+                SETTINGS.drillstring_collection,
+                urlencode({
+                    'query': '{"asset_id": 0, "_id": {"$in": ["0"]}}',
+                    'sort': '{"timestamp": 1}',
+                    'limit': 100,
+                    'skip': 0,
+                    'fields': '_id,data'
+                })
+            )
         ),
         text=text
     )
@@ -117,7 +120,7 @@ def test_gamma_depth(event, text, expected, requests_mock: requests_mock_lib.Moc
     post_mock = requests_mock.post(
         urljoin(
             CORVA_SETTINGS.DATA_API_ROOT_URL,
-            f'api/v1/data/{SETTINGS.provider}/{SETTINGS.collection}'
+            f'api/v1/data/{SETTINGS.provider}/{SETTINGS.actual_gamma_depth_collection}'
         )
     )
 
@@ -159,14 +162,17 @@ def test_get_drillstrings_gathers_all_data(mocker: MockerFixture, requests_mock:
             requests_mock.get(
                 urljoin(
                     CORVA_SETTINGS.DATA_API_ROOT_URL,
-                    'api/v1/data/corva/data.drillstring?%s'
-                    % urlencode({
-                        'query': '{"asset_id": 0, "_id": {"$in": %s}}' % json.dumps(ids),
-                        'sort': '{"timestamp": 1}',
-                        'limit': 1,
-                        'skip': skip,
-                        'fields': '_id,data'
-                    })
+                    'api/v1/data/corva/%s?%s'
+                    % (
+                        SETTINGS.drillstring_collection,
+                        urlencode({
+                            'query': '{"asset_id": 0, "_id": {"$in": %s}}' % json.dumps(ids),
+                            'sort': '{"timestamp": 1}',
+                            'limit': 1,
+                            'skip': skip,
+                            'fields': '_id,data'
+                        })
+                    )
                 ),
                 text=text
             )
