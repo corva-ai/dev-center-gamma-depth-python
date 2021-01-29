@@ -20,7 +20,7 @@ def get_drillstrings(asset_id: int, ids: List[str], api: Api, limit: int) -> Lis
             params={
                 'query': json.dumps({
                     'asset_id': asset_id,
-                    '_id': {'$in': list(ids)}
+                    '_id': {'$in': ids}
                 }),
                 'sort': '{"timestamp": 1}',
                 'limit': limit,
@@ -49,7 +49,7 @@ def gamma_depth(event: StreamEvent, api: Api, cache: Cache) -> None:
 
     # if request fails, lambda will be reinvoked. so no exception handling
     drillstrings = get_drillstrings(
-        asset_id=event.asset_id, ids=event.drillstring_ids, api=api, limit=100
+        asset_id=event.asset_id, ids=list(event.drillstring_ids), api=api, limit=100
     )
 
     id_to_drillstring = {

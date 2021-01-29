@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import List, Optional
+from typing import List, Optional, Set
 
 import pydantic
 from corva import StreamEvent
@@ -34,15 +34,10 @@ class GammaDepthEvent(StreamEvent):
         return event.copy(update={'records': new_records}, deep=True)
 
     @property
-    def drillstring_ids(self) -> List[str]:
+    def drillstring_ids(self) -> Set[str]:
         """returns unique drillstring ids"""
 
-        ids = list(
-            set(
-                record.metadata.drillstring_id
-                for record in self.records
-            )
-        )
+        ids = set(record.metadata.drillstring_id for record in self.records)
 
         return ids
 
