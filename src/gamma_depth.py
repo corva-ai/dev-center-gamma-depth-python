@@ -35,7 +35,7 @@ def get_drillstrings(asset_id: int, ids: List[str], api: Api, limit: int) -> Ite
             break
 
 
-def gamma_depth(event: StreamEvent, api: Api, cache: Cache):
+def gamma_depth(event: StreamEvent, api: Api, cache: Cache) -> None:
     event = GammaDepthEvent.parse_obj(event)
 
     event = GammaDepthEvent.filter_records_with_no_drillstring_id(event=event)
