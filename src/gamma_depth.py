@@ -1,6 +1,6 @@
 import itertools
 import json
-from typing import Dict, Iterator, List
+from typing import Dict, List
 
 import pydantic
 from corva import Api, Cache, StreamEvent
@@ -9,8 +9,10 @@ from src.configuration import SETTINGS
 from src.models import ActualGammaDepth, ActualGammaDepthData, Drillstring, GammaDepthEvent
 
 
-def get_drillstrings(asset_id: int, ids: List[str], api: Api, limit: int) -> Iterator[Drillstring]:
+def get_drillstrings(asset_id: int, ids: List[str], api: Api, limit: int) -> List[Drillstring]:
     """gathers all drillstring data from the api"""
+
+    all_drillstrings = []
 
     for skip in itertools.count(0, limit):
         response = api.get(
@@ -28,11 +30,12 @@ def get_drillstrings(asset_id: int, ids: List[str], api: Api, limit: int) -> Ite
         )
         drillstrings = pydantic.parse_obj_as(List[Drillstring], response.json())
 
-        for drillstring in drillstrings:
-            yield drillstring
+        all_drillstrings.extend(drillstrings)
 
         if len(drillstrings) != limit:
             break
+
+    return all_drillstrings
 
 
 def gamma_depth(event: StreamEvent, api: Api, cache: Cache) -> None:
@@ -45,10 +48,8 @@ def gamma_depth(event: StreamEvent, api: Api, cache: Cache) -> None:
         return
 
     # if request fails, lambda will be reinvoked. so no exception handling
-    drillstrings = list(
-        get_drillstrings(
-            asset_id=event.asset_id, ids=event.drillstring_ids, api=api, limit=100
-        )
+    drillstrings = get_drillstrings(
+        asset_id=event.asset_id, ids=event.drillstring_ids, api=api, limit=100
     )
 
     id_to_drillstring = {
