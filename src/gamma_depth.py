@@ -6,10 +6,17 @@ import pydantic
 from corva import Api, Cache, StreamEvent
 
 from src.configuration import SETTINGS
-from src.models import ActualGammaDepth, ActualGammaDepthData, Drillstring, GammaDepthEvent
+from src.models import (
+    ActualGammaDepth,
+    ActualGammaDepthData,
+    Drillstring,
+    GammaDepthEvent,
+)
 
 
-def get_drillstrings(asset_id: int, ids: List[str], api: Api, limit: int) -> List[Drillstring]:
+def get_drillstrings(
+    asset_id: int, ids: List[str], api: Api, limit: int
+) -> List[Drillstring]:
     """gathers all drillstring data from the api"""
 
     all_drillstrings = []
@@ -18,15 +25,12 @@ def get_drillstrings(asset_id: int, ids: List[str], api: Api, limit: int) -> Lis
         response = api.get(
             f'api/v1/data/corva/{SETTINGS.drillstring_collection}/',
             params={
-                'query': json.dumps({
-                    'asset_id': asset_id,
-                    '_id': {'$in': ids}
-                }),
+                'query': json.dumps({'asset_id': asset_id, '_id': {'$in': ids}}),
                 'sort': '{"timestamp": 1}',
                 'limit': limit,
                 'skip': skip,
-                'fields': '_id,data'
-            }
+                'fields': '_id,data',
+            },
         )
         drillstrings = pydantic.parse_obj_as(List[Drillstring], response.json())
 
@@ -53,8 +57,7 @@ def gamma_depth(event: StreamEvent, api: Api, cache: Cache) -> None:
     )
 
     id_to_drillstring = {
-        drillstring.id: drillstring
-        for drillstring in drillstrings
+        drillstring.id: drillstring for drillstring in drillstrings
     }  # type: Dict[str, Drillstring]
 
     actual_gamma_depths = []
@@ -64,11 +67,12 @@ def gamma_depth(event: StreamEvent, api: Api, cache: Cache) -> None:
         # the record may be tagged with a drillstring, that gets deleted before the Lambda run.
         # data about this drillstring won't be received from the api, thus missing from the dict
         if (
-             (drillstring := id_to_drillstring.get(record.metadata.drillstring_id))
-             and
-             drillstring.mwd_with_gamma_sensor
-        ):
-            gamma_depth_val = record.data.bit_depth - drillstring.mwd_with_gamma_sensor.gamma_sensor_to_bit_distance
+            drillstring := id_to_drillstring.get(record.metadata.drillstring_id)
+        ) and drillstring.mwd_with_gamma_sensor:
+            gamma_depth_val = (
+                record.data.bit_depth
+                - drillstring.mwd_with_gamma_sensor.gamma_sensor_to_bit_distance
+            )
 
         actual_gamma_depths.append(
             ActualGammaDepth(
@@ -78,16 +82,16 @@ def gamma_depth(event: StreamEvent, api: Api, cache: Cache) -> None:
                 data=ActualGammaDepthData(
                     gamma_depth=gamma_depth_val,
                     bit_depth=record.data.bit_depth,
-                    gamma_ray=record.data.gamma_ray
+                    gamma_ray=record.data.gamma_ray,
                 ),
                 provider=SETTINGS.provider,
                 timestamp=record.timestamp,
-                version=SETTINGS.version
+                version=SETTINGS.version,
             )
         )
 
     # if request fails, lambda will be reinvoked. so no exception handling
     api.post(
         f'api/v1/data/{SETTINGS.provider}/{SETTINGS.actual_gamma_depth_collection}/',
-        data=[entry.dict() for entry in actual_gamma_depths]
+        data=[entry.dict() for entry in actual_gamma_depths],
     )

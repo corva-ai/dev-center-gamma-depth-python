@@ -25,7 +25,9 @@ class GammaDepthEvent(StreamEvent):
     records: List[GammaDepthRecord]
 
     @staticmethod
-    def filter_records_with_no_drillstring_id(event: GammaDepthEvent) -> GammaDepthEvent:
+    def filter_records_with_no_drillstring_id(
+        event: GammaDepthEvent,
+    ) -> GammaDepthEvent:
         new_records = [
             record
             for record in event.records
