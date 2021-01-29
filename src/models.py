@@ -39,7 +39,11 @@ class GammaDepthEvent(StreamEvent):
     def drillstring_ids(self) -> Set[str]:
         """returns unique drillstring ids"""
 
-        ids = set(record.metadata.drillstring_id for record in self.records)
+        ids = set(
+            record.metadata.drillstring_id
+            for record in self.records
+            if record.metadata.drillstring_id
+        )
 
         return ids
 
