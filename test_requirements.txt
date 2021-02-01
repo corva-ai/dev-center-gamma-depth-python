@@ -1,0 +1,5 @@
+-r requirements.txt
+fakeredis==1.4.5
+pytest==6.2.2
+pytest-mock==3.5.1
+requests-mock==1.8.0
