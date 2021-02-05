@@ -50,8 +50,8 @@ class GammaDepthEvent(StreamEvent):
 
 class DrillstringDataComponent(pydantic.BaseModel):
     family: str
-    gamma_sensor_to_bit_distance: float
-    has_gamma_sensor: bool
+    gamma_sensor_to_bit_distance: Optional[float]
+    has_gamma_sensor: Optional[bool] = False
 
 
 class DrillstringData(pydantic.BaseModel):
