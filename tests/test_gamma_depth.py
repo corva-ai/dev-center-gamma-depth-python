@@ -1,4 +1,5 @@
 import json
+from types import SimpleNamespace
 from typing import List
 from urllib.parse import urlencode, urljoin
 
@@ -14,7 +15,12 @@ from src.gamma_depth import get_drillstrings
 from src.models import ActualGammaDepth, ActualGammaDepthData, GammaDepthEvent
 
 
-def test_records_with_no_drillstring_are_filtered(mocker: MockerFixture):
+@pytest.fixture
+def context():
+    return SimpleNamespace(client_context=SimpleNamespace(env={'API_KEY': '123'}))
+
+
+def test_records_with_no_drillstring_are_filtered(mocker: MockerFixture, context):
     """tests, that record with no drillstring is deleted and func returns early, as no records left."""
 
     event = (
@@ -26,7 +32,7 @@ def test_records_with_no_drillstring_are_filtered(mocker: MockerFixture):
 
     spy = mocker.spy(GammaDepthEvent, 'filter_records_with_no_drillstring_id')
 
-    lambda_handler(event, None)
+    lambda_handler(event, context)
 
     assert len(spy.spy_return.records) == 0
 
@@ -90,11 +96,13 @@ def test_records_with_no_drillstring_are_filtered(mocker: MockerFixture):
         'missing_drillstring_data_from_api',
     ],
 )
-def test_gamma_depth(event, text, expected, requests_mock: requests_mock_lib.Mocker):
+def test_gamma_depth(
+    event, text, expected, requests_mock: requests_mock_lib.Mocker, context
+):
     get_mock = requests_mock.get(
         urljoin(
             CORVA_SETTINGS.DATA_API_ROOT_URL,
-            'api/v1/data/corva/%s?%s'
+            'api/v1/data/corva/%s/?%s'
             % (
                 SETTINGS.drillstring_collection,
                 urlencode(
@@ -114,11 +122,11 @@ def test_gamma_depth(event, text, expected, requests_mock: requests_mock_lib.Moc
     post_mock = requests_mock.post(
         urljoin(
             CORVA_SETTINGS.DATA_API_ROOT_URL,
-            f'api/v1/data/{SETTINGS.provider}/{SETTINGS.actual_gamma_depth_collection}',
+            f'api/v1/data/{SETTINGS.provider}/{SETTINGS.actual_gamma_depth_collection}/',
         )
     )
 
-    lambda_handler(event, None)
+    lambda_handler(event, context)
 
     assert get_mock.called
     assert post_mock.called_once
@@ -131,7 +139,7 @@ def test_gamma_depth(event, text, expected, requests_mock: requests_mock_lib.Moc
 
 
 def test_get_drillstrings_gathers_all_data(
-    mocker: MockerFixture, requests_mock: requests_mock_lib.Mocker
+    mocker: MockerFixture, requests_mock: requests_mock_lib.Mocker, context
 ):
     """tests, that all drillstrings received from the api, in case there is more drillstrings, than api limit"""
 
@@ -160,7 +168,7 @@ def test_get_drillstrings_gathers_all_data(
             requests_mock.get(
                 urljoin(
                     CORVA_SETTINGS.DATA_API_ROOT_URL,
-                    'api/v1/data/corva/%s?%s'
+                    'api/v1/data/corva/%s/?%s'
                     % (
                         SETTINGS.drillstring_collection,
                         urlencode(
@@ -180,7 +188,7 @@ def test_get_drillstrings_gathers_all_data(
 
     post_mock = requests_mock.post(requests_mock_lib.ANY)
 
-    lambda_handler(event, None)
+    lambda_handler(event, context)
 
     assert post_mock.called_once
     assert len(post_mock.last_request.json()) == 2
