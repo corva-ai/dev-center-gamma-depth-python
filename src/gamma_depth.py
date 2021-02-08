@@ -23,7 +23,7 @@ def get_drillstrings(
 
     for skip in itertools.count(0, limit):
         response = api.get(
-            f'api/v1/data/corva/{SETTINGS.drillstring_collection}',
+            f'api/v1/data/corva/{SETTINGS.drillstring_collection}/',
             params={
                 'query': json.dumps({'asset_id': asset_id, '_id': {'$in': ids}}),
                 'sort': '{"timestamp": 1}',
@@ -92,6 +92,6 @@ def gamma_depth(event: StreamEvent, api: Api, cache: Cache) -> None:
 
     # if request fails, lambda will be reinvoked. so no exception handling
     api.post(
-        f'api/v1/data/{SETTINGS.provider}/{SETTINGS.actual_gamma_depth_collection}',
+        f'api/v1/data/{SETTINGS.provider}/{SETTINGS.actual_gamma_depth_collection}/',
         data=[entry.dict() for entry in actual_gamma_depths],
     )

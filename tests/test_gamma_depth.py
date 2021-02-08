@@ -102,7 +102,7 @@ def test_gamma_depth(
     get_mock = requests_mock.get(
         urljoin(
             CORVA_SETTINGS.DATA_API_ROOT_URL,
-            'api/v1/data/corva/%s?%s'
+            'api/v1/data/corva/%s/?%s'
             % (
                 SETTINGS.drillstring_collection,
                 urlencode(
@@ -122,7 +122,7 @@ def test_gamma_depth(
     post_mock = requests_mock.post(
         urljoin(
             CORVA_SETTINGS.DATA_API_ROOT_URL,
-            f'api/v1/data/{SETTINGS.provider}/{SETTINGS.actual_gamma_depth_collection}',
+            f'api/v1/data/{SETTINGS.provider}/{SETTINGS.actual_gamma_depth_collection}/',
         )
     )
 
@@ -168,7 +168,7 @@ def test_get_drillstrings_gathers_all_data(
             requests_mock.get(
                 urljoin(
                     CORVA_SETTINGS.DATA_API_ROOT_URL,
-                    'api/v1/data/corva/%s?%s'
+                    'api/v1/data/corva/%s/?%s'
                     % (
                         SETTINGS.drillstring_collection,
                         urlencode(
