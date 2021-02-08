@@ -1,2 +1,2 @@
-corva-sdk==0.0.4
+corva-sdk==0.0.10
 pydantic==1.7.3
