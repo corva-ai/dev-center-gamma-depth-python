@@ -5,14 +5,14 @@ from typing import List, Optional, Set
 
 import pydantic
 from corva import StreamEvent
-from corva.models.stream import Record, RecordData
+from corva.models.stream import Record
 
 
 class GammaDepthRecordMetadata(pydantic.BaseModel):
     drillstring_id: Optional[str] = pydantic.Field(None, alias='drillstring')
 
 
-class GammaDepthRecordData(RecordData):
+class GammaDepthRecordData(pydantic.BaseModel):
     bit_depth: float
     gamma_ray: int
 
