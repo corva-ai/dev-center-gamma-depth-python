@@ -192,3 +192,125 @@ def test_get_drillstrings_gathers_all_data(
 
     assert post_mock.called_once
     assert len(post_mock.last_request.json()) == 2
+
+
+@pytest.mark.parametrize(
+    'components,expected_data',
+    [
+        (
+            [
+                {
+                    "family": "mwd",
+                    "has_gamma_sensor": True,
+                    "gamma_sensor_to_bit_distance": 1.0,
+                }
+            ],
+            ActualGammaDepthData(gamma_depth=0.0, bit_depth=1.0, gamma_ray=2),
+        ),
+        (
+            [
+                {
+                    "family": "mwd",
+                    "has_gamma_sensor": None,
+                    "gamma_sensor_to_bit_distance": 1.0,
+                }
+            ],
+            ActualGammaDepthData(gamma_depth=1.0, bit_depth=1.0, gamma_ray=2),
+        ),
+        (
+            [
+                {
+                    "family": "mwd",
+                    "has_gamma_sensor": True,
+                    "gamma_sensor_to_bit_distance": None,
+                }
+            ],
+            ActualGammaDepthData(gamma_depth=1.0, bit_depth=1.0, gamma_ray=2),
+        ),
+        (
+            [
+                {
+                    "family": "mwd",
+                    "has_gamma_sensor": None,
+                    "gamma_sensor_to_bit_distance": None,
+                }
+            ],
+            ActualGammaDepthData(gamma_depth=1.0, bit_depth=1.0, gamma_ray=2),
+        ),
+        (
+            [
+                {
+                    "family": "mwd",
+                    "has_gamma_sensor": None,
+                    "gamma_sensor_to_bit_distance": None,
+                },
+                {
+                    "family": "mwd",
+                    "has_gamma_sensor": True,
+                    "gamma_sensor_to_bit_distance": 2.0,
+                },
+            ],
+            ActualGammaDepthData(gamma_depth=-1.0, bit_depth=1.0, gamma_ray=2),
+        ),
+    ],
+    ids=[
+        'correct component',
+        'wrong component',
+        'wrong component',
+        'wrong component',
+        'one wrong, one correct component',
+    ],
+)
+def test_drillstrings_are_filtered(
+    components, expected_data, requests_mock: requests_mock_lib.Mocker, context
+):
+    event = json.dumps(
+        [
+            {
+                "records": [
+                    {
+                        "timestamp": 0,
+                        "asset_id": 0,
+                        "company_id": 0,
+                        "version": 0,
+                        "collection": "",
+                        "data": {"bit_depth": 1.0, "gamma_ray": 2},
+                        "metadata": {"drillstring": "0"},
+                    }
+                ],
+                "metadata": {
+                    "app_stream_id": 0,
+                    "apps": {
+                        CORVA_SETTINGS.APP_KEY: {
+                            "app_connection_id": 0,
+                        }
+                    },
+                },
+            }
+        ]
+    )
+    text = json.dumps([{"_id": "0", "data": {"components": components}}])
+    expected = ActualGammaDepth(
+        asset_id=0,
+        collection=SETTINGS.actual_gamma_depth_collection,
+        company_id=0,
+        data=expected_data,
+        provider=SETTINGS.provider,
+        timestamp=0,
+        version=SETTINGS.version,
+    )
+
+    get_mock = requests_mock.get(requests_mock_lib.ANY, text=text)
+
+    post_mock = requests_mock.post(requests_mock_lib.ANY)
+
+    lambda_handler(event, context)
+
+    assert get_mock.called_once
+    assert post_mock.called_once
+
+    actual_gamma_depths = pydantic.parse_obj_as(
+        List[ActualGammaDepth], post_mock.last_request.json()
+    )  # type: List[ActualGammaDepth]
+
+    assert actual_gamma_depths[0] == expected

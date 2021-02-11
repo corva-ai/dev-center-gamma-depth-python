@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import copy
 from typing import List, Optional, Set
 
 import pydantic
@@ -63,6 +64,21 @@ class Drillstring(pydantic.BaseModel):
 
     id: str = pydantic.Field(..., alias='_id')
     data: DrillstringData
+
+    @classmethod
+    def filter(cls, drillstring: Drillstring) -> Drillstring:
+        new_components = [
+            component
+            for component in copy.deepcopy(drillstring.data.components)
+            if component.gamma_sensor_to_bit_distance is not None
+            and component.has_gamma_sensor is not None
+        ]
+
+        result = drillstring.copy(
+            update={'data': DrillstringData(components=new_components)}, deep=True
+        )
+
+        return result
 
     @property
     def mwd_with_gamma_sensor(self) -> Optional[DrillstringDataComponent]:
