@@ -19,7 +19,7 @@ class GammaDepthRecordData(pydantic.BaseModel):
 
 class GammaDepthRecord(Record):
     data: GammaDepthRecordData
-    metadata: GammaDepthRecordMetadata
+    metadata: Optional[GammaDepthRecordMetadata] = None
 
 
 class GammaDepthEvent(StreamEvent):
@@ -32,7 +32,7 @@ class GammaDepthEvent(StreamEvent):
         new_records = [
             record
             for record in event.records
-            if record.metadata.drillstring_id is not None
+            if record.metadata and record.metadata.drillstring_id is not None
         ]
         return event.copy(update={'records': new_records}, deep=True)
 
