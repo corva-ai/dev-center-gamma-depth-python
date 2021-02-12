@@ -4,37 +4,43 @@ import copy
 from typing import List, Optional, Set
 
 import pydantic
-from corva import StreamEvent
-from corva.models.stream import Record, RecordData
 
 
 class GammaDepthRecordMetadata(pydantic.BaseModel):
-    drillstring_id: Optional[str] = pydantic.Field(None, alias='drillstring')
+    drillstring_id: Optional[str] = pydantic.Field(None, alias="drillstring")
 
 
-class GammaDepthRecordData(RecordData):
+class GammaDepthRecordData(pydantic.BaseModel):
     bit_depth: float
     gamma_ray: int
 
 
-class GammaDepthRecord(Record):
+class GammaDepthRecord(pydantic.BaseModel):
+    asset_id: int
+    company_id: int
+    timestamp: int
     data: GammaDepthRecordData
-    metadata: GammaDepthRecordMetadata
+    metadata: Optional[GammaDepthRecordMetadata] = None
 
 
-class GammaDepthEvent(StreamEvent):
-    records: List[GammaDepthRecord]
+class GammaDepthEvent(pydantic.BaseModel):
+    records: pydantic.conlist(GammaDepthRecord, min_items=1)
+
+    @property
+    def asset_id(self) -> int:
+        return self.records[0].asset_id
 
     @staticmethod
-    def filter_records_with_no_drillstring_id(
-        event: GammaDepthEvent,
-    ) -> GammaDepthEvent:
+    def filter_records(event: GammaDepthEvent) -> List[GammaDepthRecord]:
+        """filters records with no drillstring_id"""
+
         new_records = [
-            record
+            copy.deepcopy(record)
             for record in event.records
-            if record.metadata.drillstring_id is not None
+            if record.metadata and record.metadata.drillstring_id
         ]
-        return event.copy(update={'records': new_records}, deep=True)
+
+        return new_records
 
     @property
     def drillstring_ids(self) -> Set[str]:
@@ -43,7 +49,7 @@ class GammaDepthEvent(StreamEvent):
         ids = set(
             record.metadata.drillstring_id
             for record in self.records
-            if record.metadata.drillstring_id
+            if record.metadata and record.metadata.drillstring_id
         )
 
         return ids
@@ -62,20 +68,21 @@ class DrillstringData(pydantic.BaseModel):
 class Drillstring(pydantic.BaseModel):
     """Needed subset of drillstring response fields"""
 
-    id: str = pydantic.Field(..., alias='_id')
+    id: str = pydantic.Field(..., alias="_id")
     data: DrillstringData
 
     @classmethod
     def filter(cls, drillstring: Drillstring) -> Drillstring:
         new_components = [
-            component
-            for component in copy.deepcopy(drillstring.data.components)
+            copy.deepcopy(component)
+            for component in drillstring.data.components
             if component.gamma_sensor_to_bit_distance is not None
             and component.has_gamma_sensor is not None
+            and component.family == "mwd"
         ]
 
         result = drillstring.copy(
-            update={'data': DrillstringData(components=new_components)}, deep=True
+            update={"data": DrillstringData(components=new_components)}, deep=True
         )
 
         return result
@@ -85,7 +92,7 @@ class Drillstring(pydantic.BaseModel):
         """returns MWD component with a gamma sensor"""
 
         for component in self.data.components:
-            if component.family == 'mwd' and component.has_gamma_sensor:
+            if component.family == "mwd" and component.has_gamma_sensor:
                 return component
 
         return None
