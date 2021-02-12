@@ -160,7 +160,7 @@ def test_get_drillstrings_gathers_all_data(
 
     assert get_mock.call_count == 3
     for skip, req in enumerate(get_mock.request_history):
-        assert req.qs['skip'] == [f'{skip}']
+        assert req.qs["skip"] == [f"{skip}"]
     assert post_mock.called_once
     assert len(post_mock.last_request.json()) == 2
 
@@ -301,6 +301,76 @@ def test_gamma_depth(
         (
             [
                 {
+                    "family": "random",
+                    "has_gamma_sensor": None,
+                    "gamma_sensor_to_bit_distance": None,
+                }
+            ],
+            1.0,
+        ),
+        (
+            [
+                {
+                    "family": "random",
+                    "has_gamma_sensor": None,
+                    "gamma_sensor_to_bit_distance": 1.0,
+                }
+            ],
+            1.0,
+        ),
+        (
+            [
+                {
+                    "family": "random",
+                    "has_gamma_sensor": True,
+                    "gamma_sensor_to_bit_distance": None,
+                }
+            ],
+            1.0,
+        ),
+        (
+            [
+                {
+                    "family": "random",
+                    "has_gamma_sensor": True,
+                    "gamma_sensor_to_bit_distance": 1.0,
+                }
+            ],
+            1.0,
+        ),
+        (
+            [
+                {
+                    "family": "mwd",
+                    "has_gamma_sensor": None,
+                    "gamma_sensor_to_bit_distance": None,
+                }
+            ],
+            1.0,
+        ),
+        (
+            [
+                {
+                    "family": "mwd",
+                    "has_gamma_sensor": None,
+                    "gamma_sensor_to_bit_distance": 1.0,
+                }
+            ],
+            1.0,
+        ),
+        (
+            [
+                {
+                    "family": "mwd",
+                    "has_gamma_sensor": True,
+                    "gamma_sensor_to_bit_distance": None,
+                }
+            ],
+            1.0,
+        ),
+        (
+            [
+                {
                     "family": "mwd",
                     "has_gamma_sensor": True,
                     "gamma_sensor_to_bit_distance": 1.0,
@@ -312,53 +382,27 @@ def test_gamma_depth(
             [
                 {
                     "family": "mwd",
-                    "has_gamma_sensor": None,
+                    "has_gamma_sensor": True,
+                    "gamma_sensor_to_bit_distance": None,
+                },
+                {
+                    "family": "mwd",
+                    "has_gamma_sensor": True,
                     "gamma_sensor_to_bit_distance": 1.0,
-                }
-            ],
-            1.0,
-        ),
-        (
-            [
-                {
-                    "family": "mwd",
-                    "has_gamma_sensor": True,
-                    "gamma_sensor_to_bit_distance": None,
-                }
-            ],
-            1.0,
-        ),
-        (
-            [
-                {
-                    "family": "mwd",
-                    "has_gamma_sensor": None,
-                    "gamma_sensor_to_bit_distance": None,
-                }
-            ],
-            1.0,
-        ),
-        (
-            [
-                {
-                    "family": "mwd",
-                    "has_gamma_sensor": None,
-                    "gamma_sensor_to_bit_distance": None,
-                },
-                {
-                    "family": "mwd",
-                    "has_gamma_sensor": True,
-                    "gamma_sensor_to_bit_distance": 2.0,
                 },
             ],
-            -1.0,
+            0.0,
         ),
     ],
     ids=[
+        "wrong component",
+        "wrong component",
+        "wrong component",
+        "wrong component",
+        "wrong component",
+        "wrong component",
+        "wrong component",
         "correct component",
-        "wrong component",
-        "wrong component",
-        "wrong component",
         "one wrong, one correct component",
     ],
 )

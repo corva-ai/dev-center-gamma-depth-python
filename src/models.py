@@ -78,6 +78,7 @@ class Drillstring(pydantic.BaseModel):
             for component in drillstring.data.components
             if component.gamma_sensor_to_bit_distance is not None
             and component.has_gamma_sensor is not None
+            and component.family == "mwd"
         ]
 
         result = drillstring.copy(
