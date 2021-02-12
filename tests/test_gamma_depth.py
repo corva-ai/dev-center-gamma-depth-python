@@ -159,6 +159,8 @@ def test_get_drillstrings_gathers_all_data(
     lambda_handler(event, context)
 
     assert get_mock.call_count == 3
+    for skip, req in enumerate(get_mock.request_history):
+        assert req.qs['skip'] == [f'{skip}']
     assert post_mock.called_once
     assert len(post_mock.last_request.json()) == 2
 
