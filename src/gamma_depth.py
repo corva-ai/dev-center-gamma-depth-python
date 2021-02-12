@@ -1,6 +1,6 @@
 import itertools
 import json
-from typing import Dict, List
+from typing import Dict, List, Optional
 
 import pydantic
 from corva import Api, Cache, StreamEvent
@@ -23,15 +23,17 @@ def get_drillstrings(
 
     for skip in itertools.count(0, limit):
         response = api.get(
-            f'api/v1/data/corva/{SETTINGS.drillstring_collection}/',
+            f"api/v1/data/corva/{SETTINGS.drillstring_collection}/",
             params={
-                'query': json.dumps({'asset_id': asset_id, '_id': {'$in': ids}}),
-                'sort': '{"timestamp": 1}',
-                'limit': limit,
-                'skip': skip,
-                'fields': '_id,data',
+                "query": json.dumps({"asset_id": asset_id, "_id": {"$in": ids}}),
+                "sort": '{"timestamp": 1}',
+                "limit": limit,
+                "skip": skip,
+                "fields": "_id,data",
             },
         )
+        response.raise_for_status()
+
         drillstrings = pydantic.parse_obj_as(List[Drillstring], response.json())
 
         all_drillstrings.extend(drillstrings)
@@ -42,13 +44,24 @@ def get_drillstrings(
     return all_drillstrings
 
 
-def gamma_depth(event: StreamEvent, api: Api, cache: Cache) -> None:
+def parse_event(event: StreamEvent) -> Optional[GammaDepthEvent]:
     event = GammaDepthEvent.parse_obj(event)
 
-    event = GammaDepthEvent.filter_records_with_no_drillstring_id(event=event)
+    new_records = GammaDepthEvent.filter_records(event=event)
 
-    # return early if records were not tagged with a drillstring
-    if not event.drillstring_ids:
+    # return early if there are no records left after filtering
+    if not new_records:
+        return None
+
+    event.records = new_records
+
+    return event
+
+
+def gamma_depth(event: StreamEvent, api: Api, cache: Cache) -> None:
+    event = parse_event(event=event)
+
+    if not event:
         return
 
     # if request fails, lambda will be reinvoked. so no exception handling
@@ -95,6 +108,6 @@ def gamma_depth(event: StreamEvent, api: Api, cache: Cache) -> None:
 
     # if request fails, lambda will be reinvoked. so no exception handling
     api.post(
-        f'api/v1/data/{SETTINGS.provider}/{SETTINGS.actual_gamma_depth_collection}/',
+        f"api/v1/data/{SETTINGS.provider}/{SETTINGS.actual_gamma_depth_collection}/",
         data=[entry.dict() for entry in actual_gamma_depths],
-    )
+    ).raise_for_status()
