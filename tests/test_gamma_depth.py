@@ -145,37 +145,20 @@ def test_get_drillstrings_gathers_all_data(
         ),  # override limit
     )
 
-    for skip, text in [
-        (0, '[{"_id": "0", "data": {"components": []}}]'),
-        (1, '[{"_id": "1", "data": {"components": []}}]'),
-        (2, "[]"),
-    ]:
-        for ids in [["0", "1"], ["1", "0"]]:  # ids can be in any order
-            requests_mock.get(
-                urljoin(
-                    CORVA_SETTINGS.DATA_API_ROOT_URL,
-                    "api/v1/data/corva/%s/?%s"
-                    % (
-                        SETTINGS.drillstring_collection,
-                        urlencode(
-                            {
-                                "query": '{"asset_id": 0, "_id": {"$in": %s}}'
-                                % json.dumps(ids),
-                                "sort": '{"timestamp": 1}',
-                                "limit": 1,
-                                "skip": skip,
-                                "fields": "_id,data",
-                            }
-                        ),
-                    ),
-                ),
-                text=text,
-            )
+    get_mock = requests_mock.get(
+        requests_mock_lib.ANY,
+        [
+            {"text": '[{"_id": "0", "data": {"components": []}}]'},
+            {"text": '[{"_id": "1", "data": {"components": []}}]'},
+            {"text": "[]"},
+        ],
+    )
 
     post_mock = requests_mock.post(requests_mock_lib.ANY)
 
     lambda_handler(event, context)
 
+    assert get_mock.call_count == 3
     assert post_mock.called_once
     assert len(post_mock.last_request.json()) == 2
 
