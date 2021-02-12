@@ -56,6 +56,9 @@ def gamma_depth(event: StreamEvent, api: Api, cache: Cache) -> None:
         asset_id=event.asset_id, ids=list(event.drillstring_ids), api=api, limit=100
     )
 
+    # filter drillstrings
+    drillstrings = [Drillstring.filter(drillstring) for drillstring in drillstrings]
+
     id_to_drillstring = {
         drillstring.id: drillstring for drillstring in drillstrings
     }  # type: Dict[str, Drillstring]
