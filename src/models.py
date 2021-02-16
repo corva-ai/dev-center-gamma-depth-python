@@ -6,32 +6,32 @@ from typing import List, Optional, Set
 import pydantic
 
 
-class GammaDepthRecordMetadata(pydantic.BaseModel):
+class WitsRecordMetadata(pydantic.BaseModel):
     drillstring_id: Optional[str] = pydantic.Field(None, alias="drillstring")
 
 
-class GammaDepthRecordData(pydantic.BaseModel):
+class WitsRecordData(pydantic.BaseModel):
     bit_depth: float
-    gamma_ray: int
+    gamma_ray: float
 
 
-class GammaDepthRecord(pydantic.BaseModel):
+class WitsRecord(pydantic.BaseModel):
     asset_id: int
     company_id: int
     timestamp: int
-    data: GammaDepthRecordData
-    metadata: Optional[GammaDepthRecordMetadata] = None
+    data: WitsRecordData
+    metadata: Optional[WitsRecordMetadata] = None
 
 
 class GammaDepthEvent(pydantic.BaseModel):
-    records: pydantic.conlist(GammaDepthRecord, min_items=1)
+    records: pydantic.conlist(WitsRecord, min_items=1)
 
     @property
     def asset_id(self) -> int:
         return self.records[0].asset_id
 
     @staticmethod
-    def filter_records(event: GammaDepthEvent) -> List[GammaDepthRecord]:
+    def filter_records(event: GammaDepthEvent) -> List[WitsRecord]:
         """filters records with no drillstring_id"""
 
         new_records = [
