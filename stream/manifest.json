@@ -13,7 +13,7 @@
     "visibility": "private",
     "name": "My Sample App",
     "category": "analytics",
-    "segment": "drilling"
+    "segments": ["drilling"]
   },
   "settings": {
     "entrypoint": {
