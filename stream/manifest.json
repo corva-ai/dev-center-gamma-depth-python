@@ -27,13 +27,13 @@
   "environment": {},
   "datasets": {
     "my-provider.actual-gamma-depth": {
-      "permission": [
+      "permissions": [
         "read",
         "write"
       ]
     },
     "corva.data.drillstring": {
-      "permission": [
+      "permissions": [
         "read"
       ]
     }
