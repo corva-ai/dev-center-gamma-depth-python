@@ -101,7 +101,7 @@ class Drillstring(pydantic.BaseModel):
 class ActualGammaDepthData(pydantic.BaseModel):
     bit_depth: float
     gamma_depth: float
-    gamma_ray: int
+    gamma_ray: float
 
 
 class ActualGammaDepth(pydantic.BaseModel):
