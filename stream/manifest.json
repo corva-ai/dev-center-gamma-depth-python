@@ -26,7 +26,7 @@
   },
   "environment": {},
   "datasets": {
-    "my-provider.my-dataset": {
+    "my-provider.actual-gamma-depth": {
       "permission": [
         "read",
         "write"
