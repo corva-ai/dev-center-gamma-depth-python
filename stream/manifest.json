@@ -26,7 +26,7 @@
   },
   "environment": {},
   "datasets": {
-    "my-prodiver.my-dataset": {
+    "my-provider.my-dataset": {
       "permission": [
         "read",
         "write"
