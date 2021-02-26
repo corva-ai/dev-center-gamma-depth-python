@@ -1,5 +1,4 @@
 import json
-from types import SimpleNamespace
 from typing import List
 from urllib.parse import urlencode, urljoin
 
@@ -16,11 +15,6 @@ from src.gamma_depth import get_drillstrings
 from src.models import ActualGammaDepth, ActualGammaDepthData, GammaDepthEvent
 
 
-@pytest.fixture
-def context():
-    return SimpleNamespace(client_context=SimpleNamespace(env={"API_KEY": "123"}))
-
-
 @pytest.mark.parametrize(
     "metadata,is_early",
     [(None, True), ({}, True), ({"drillstring": "0"}, False)],
@@ -31,7 +25,7 @@ def test_return_early_if_no_records_after_filtering(
     is_early,
     mocker: MockerFixture,
     requests_mock: requests_mock_lib.Mocker,
-    context,
+    corva_context,
 ):
     """tests, that records with no drillstring get deleted and app returns early, as no records left."""
 
@@ -59,7 +53,7 @@ def test_return_early_if_no_records_after_filtering(
     )
     patch_api_post = requests_mock.post(requests_mock_lib.ANY)
 
-    lambda_handler(event, context)
+    lambda_handler(event, corva_context)
 
     if is_early:
         assert len(spy_filter_records.spy_return) == 0
@@ -76,7 +70,7 @@ def test_fail_if_couldnt_receive_drillstrings(
     raises,
     status_code,
     requests_mock: requests_mock_lib.Mocker,
-    context,
+    corva_context,
 ):
     event = [
         {
@@ -100,16 +94,16 @@ def test_fail_if_couldnt_receive_drillstrings(
     patch_api_post = requests_mock.post(requests_mock_lib.ANY)
 
     if raises:
-        pytest.raises(HTTPError, lambda_handler, event, context)
+        pytest.raises(HTTPError, lambda_handler, event, corva_context)
         return
 
-    lambda_handler(event, context)
+    lambda_handler(event, corva_context)
 
     assert patch_api_post.called_once
 
 
 def test_get_drillstrings_gathers_all_data(
-    mocker: MockerFixture, requests_mock: requests_mock_lib.Mocker, context
+    mocker: MockerFixture, requests_mock: requests_mock_lib.Mocker, corva_context
 ):
     """tests, that all drillstrings received from the api, in case there is more drillstrings, than api limit"""
 
@@ -156,7 +150,7 @@ def test_get_drillstrings_gathers_all_data(
 
     post_mock = requests_mock.post(requests_mock_lib.ANY)
 
-    lambda_handler(event, context)
+    lambda_handler(event, corva_context)
 
     assert get_mock.call_count == 3
     for skip, req in enumerate(get_mock.request_history):
@@ -223,7 +217,7 @@ def test_get_drillstrings_gathers_all_data(
     ],
 )
 def test_gamma_depth(
-    text, expected_gamma_depth, requests_mock: requests_mock_lib.Mocker, context
+    text, expected_gamma_depth, requests_mock: requests_mock_lib.Mocker, corva_context
 ):
     event = [
         {
@@ -283,7 +277,7 @@ def test_gamma_depth(
         )
     )
 
-    lambda_handler(event, context)
+    lambda_handler(event, corva_context)
 
     assert get_mock.called
     assert post_mock.called_once
@@ -407,7 +401,10 @@ def test_gamma_depth(
     ],
 )
 def test_drillstrings_are_filtered(
-    components, expected_gamma_depth, requests_mock: requests_mock_lib.Mocker, context
+    components,
+    expected_gamma_depth,
+    requests_mock: requests_mock_lib.Mocker,
+    corva_context,
 ):
     event = [
         {
@@ -447,7 +444,7 @@ def test_drillstrings_are_filtered(
 
     post_mock = requests_mock.post(requests_mock_lib.ANY)
 
-    lambda_handler(event, context)
+    lambda_handler(event, corva_context)
 
     assert get_mock.called_once
     assert post_mock.called_once
@@ -464,7 +461,7 @@ def test_drillstrings_are_filtered(
     "raises,status_code", [(True, 404), (False, 200)], ids=["must raise", "must pass"]
 )
 def test_fail_if_couldnt_post(
-    raises, status_code, requests_mock: requests_mock_lib.Mocker, context
+    raises, status_code, requests_mock: requests_mock_lib.Mocker, corva_context
 ):
     event = [
         {
@@ -488,9 +485,9 @@ def test_fail_if_couldnt_post(
     patch_api_post = requests_mock.post(requests_mock_lib.ANY, status_code=status_code)
 
     if raises:
-        pytest.raises(HTTPError, lambda_handler, event, context)
+        pytest.raises(HTTPError, lambda_handler, event, corva_context)
         return
 
-    lambda_handler(event, context)
+    lambda_handler(event, corva_context)
 
     assert patch_api_post.called_once
