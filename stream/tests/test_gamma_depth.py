@@ -29,23 +29,17 @@ def test_return_early_if_no_records_after_filtering(
 ):
     """tests, that records with no drillstring get deleted and app returns early, as no records left."""
 
-    event = [
-        {
-            "records": [
-                {
-                    "timestamp": 0,
-                    "asset_id": 0,
-                    "company_id": 0,
-                    "data": {"bit_depth": 0.0, "gamma_ray": 0},
-                    "metadata": metadata,
-                }
-            ],
-            "metadata": {
-                "app_stream_id": 0,
-                "apps": {CORVA_SETTINGS.APP_KEY: {"app_connection_id": 0}},
-            },
-        }
-    ]
+    event = {
+        "records": [
+            {
+                "timestamp": 0,
+                "asset_id": 0,
+                "company_id": 0,
+                "data": {"bit_depth": 0.0, "gamma_ray": 0},
+                "metadata": metadata,
+            }
+        ]
+    }
 
     spy_filter_records = mocker.spy(GammaDepthEvent, "filter_records")
     patch_get_drillstrings = mocker.patch(
@@ -72,23 +66,17 @@ def test_fail_if_couldnt_receive_drillstrings(
     requests_mock: requests_mock_lib.Mocker,
     corva_context,
 ):
-    event = [
-        {
-            "records": [
-                {
-                    "timestamp": 0,
-                    "asset_id": 0,
-                    "company_id": 0,
-                    "data": {"bit_depth": 0.0, "gamma_ray": 0},
-                    "metadata": {"drillstring": "0"},
-                }
-            ],
-            "metadata": {
-                "app_stream_id": 0,
-                "apps": {CORVA_SETTINGS.APP_KEY: {"app_connection_id": 0}},
-            },
-        }
-    ]
+    event = {
+        "records": [
+            {
+                "timestamp": 0,
+                "asset_id": 0,
+                "company_id": 0,
+                "data": {"bit_depth": 0.0, "gamma_ray": 0},
+                "metadata": {"drillstring": "0"},
+            }
+        ]
+    }
 
     requests_mock.get(requests_mock_lib.ANY, status_code=status_code, text="[]")
     patch_api_post = requests_mock.post(requests_mock_lib.ANY)
@@ -107,30 +95,24 @@ def test_get_drillstrings_gathers_all_data(
 ):
     """tests, that all drillstrings received from the api, in case there is more drillstrings, than api limit"""
 
-    event = [
-        {
-            "records": [
-                {
-                    "timestamp": 0,
-                    "asset_id": 0,
-                    "company_id": 0,
-                    "data": {"bit_depth": 0.0, "gamma_ray": 0},
-                    "metadata": {"drillstring": 0},
-                },
-                {
-                    "timestamp": 0,
-                    "asset_id": 0,
-                    "company_id": 0,
-                    "data": {"bit_depth": 0.0, "gamma_ray": 0},
-                    "metadata": {"drillstring": 1},
-                },
-            ],
-            "metadata": {
-                "app_stream_id": 0,
-                "apps": {CORVA_SETTINGS.APP_KEY: {"app_connection_id": 0}},
+    event = {
+        "records": [
+            {
+                "timestamp": 0,
+                "asset_id": 0,
+                "company_id": 0,
+                "data": {"bit_depth": 0.0, "gamma_ray": 0},
+                "metadata": {"drillstring": 0},
             },
-        }
-    ]
+            {
+                "timestamp": 0,
+                "asset_id": 0,
+                "company_id": 0,
+                "data": {"bit_depth": 0.0, "gamma_ray": 0},
+                "metadata": {"drillstring": 1},
+            },
+        ]
+    }
 
     mocker.patch(
         "src.gamma_depth.get_drillstrings",
@@ -219,25 +201,18 @@ def test_get_drillstrings_gathers_all_data(
 def test_gamma_depth(
     text, expected_gamma_depth, requests_mock: requests_mock_lib.Mocker, corva_context
 ):
-    event = [
-        {
-            "records": [
-                {
-                    "timestamp": 0,
-                    "asset_id": 0,
-                    "company_id": 0,
-                    "data": {"bit_depth": 1.0, "gamma_ray": 2},
-                    "metadata": {"drillstring": "0"},
-                }
-            ],
-            "metadata": {
-                "app_stream_id": 0,
-                "apps": {
-                    CORVA_SETTINGS.APP_KEY: {"app_connection_id": 0, "app_version": 0}
-                },
-            },
-        }
-    ]
+    event = {
+        "records": [
+            {
+                "timestamp": 0,
+                "asset_id": 0,
+                "company_id": 0,
+                "data": {"bit_depth": 1.0, "gamma_ray": 2},
+                "metadata": {"drillstring": "0"},
+            }
+        ]
+    }
+
     expected = ActualGammaDepth(
         asset_id=0,
         collection=SETTINGS.actual_gamma_depth_collection,
@@ -406,27 +381,18 @@ def test_drillstrings_are_filtered(
     requests_mock: requests_mock_lib.Mocker,
     corva_context,
 ):
-    event = [
-        {
-            "records": [
-                {
-                    "timestamp": 0,
-                    "asset_id": 0,
-                    "company_id": 0,
-                    "data": {"bit_depth": 1.0, "gamma_ray": 2},
-                    "metadata": {"drillstring": "0"},
-                }
-            ],
-            "metadata": {
-                "app_stream_id": 0,
-                "apps": {
-                    CORVA_SETTINGS.APP_KEY: {
-                        "app_connection_id": 0,
-                    }
-                },
-            },
-        }
-    ]
+    event = {
+        "records": [
+            {
+                "timestamp": 0,
+                "asset_id": 0,
+                "company_id": 0,
+                "data": {"bit_depth": 1.0, "gamma_ray": 2},
+                "metadata": {"drillstring": "0"},
+            }
+        ]
+    }
+
     text = json.dumps([{"_id": "0", "data": {"components": components}}])
     expected = ActualGammaDepth(
         asset_id=0,
@@ -463,23 +429,17 @@ def test_drillstrings_are_filtered(
 def test_fail_if_couldnt_post(
     raises, status_code, requests_mock: requests_mock_lib.Mocker, corva_context
 ):
-    event = [
-        {
-            "records": [
-                {
-                    "timestamp": 0,
-                    "asset_id": 0,
-                    "company_id": 0,
-                    "data": {"bit_depth": 0.0, "gamma_ray": 0},
-                    "metadata": {"drillstring": "0"},
-                }
-            ],
-            "metadata": {
-                "app_stream_id": 0,
-                "apps": {CORVA_SETTINGS.APP_KEY: {"app_connection_id": 0}},
-            },
-        }
-    ]
+    event = {
+        "records": [
+            {
+                "timestamp": 0,
+                "asset_id": 0,
+                "company_id": 0,
+                "data": {"bit_depth": 0.0, "gamma_ray": 0},
+                "metadata": {"drillstring": "0"},
+            }
+        ]
+    }
 
     requests_mock.get(requests_mock_lib.ANY, text="[]")
     patch_api_post = requests_mock.post(requests_mock_lib.ANY, status_code=status_code)
