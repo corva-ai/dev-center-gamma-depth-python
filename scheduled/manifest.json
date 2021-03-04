@@ -1,0 +1,44 @@
+{
+  "format": 1,
+  "license": {
+    "type": "MIT",
+    "url": "https://www.oandgexample.com/license/"
+  },
+  "developer": {
+    "authors": []
+  },
+  "application": {
+    "type": "scheduler",
+    "key": "provider.gamma-depth.scheduler",
+    "visibility": "private",
+    "name": "Gamma Depth Scheduler",
+    "category": "analytics",
+    "segment": "drilling"
+  },
+  "settings": {
+    "entrypoint": {
+      "file": "lambda_function",
+      "function": "lambda_handler"
+    },
+    "timeout": 120,
+    "memory": 128,
+    "runtime": "python3.8",
+    "app": {
+      "cron_string": "*/5 * * * *"
+    }
+  },
+  "environment": {},
+  "datasets": {
+    "provider.actual-gamma-depth.scheduler": {
+      "permissions": [
+        "read",
+        "write"
+      ]
+    },
+    "corva.data.drillstring": {
+      "permissions": [
+        "read"
+      ]
+    }
+  }
+}
