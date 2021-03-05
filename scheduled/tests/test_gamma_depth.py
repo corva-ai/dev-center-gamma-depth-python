@@ -4,6 +4,7 @@ import pytest
 import requests
 from corva import Api
 from pytest_mock import MockerFixture
+from requests_mock import Mocker as RequestsMocker
 
 from lambda_function import lambda_handler
 from src.configuration import SETTINGS
@@ -241,7 +242,7 @@ def test_fail_if_post_unsuccessful(
     raises,
     status_code,
     mocker: MockerFixture,
-    requests_mock,
+    requests_mock: RequestsMocker,
     corva_context,
     event,
     wits_record,
