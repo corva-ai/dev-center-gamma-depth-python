@@ -15,23 +15,21 @@ from src.models import (
 
 def gamma_depth(event: ScheduledEvent, api: Api, cache: Cache) -> None:
     # no exception handling. if request fails, lambda will be reinvoked.
-    records = pydantic.parse_obj_as(
-        List[WitsRecord],
-        api.get_dataset(
-            provider='corva',
-            dataset=SETTINGS.wits_collection,
-            query={
-                'asset_id': event.asset_id,
-                'timestamp': {
-                    '$gt': event.schedule_start - event.interval,
-                    '$lte': event.schedule_start,
-                },
-                'metadata.drillstring': {'$exist': True, '$ne': None},
+    raw_records = api.get_dataset(
+        provider='corva',
+        dataset=SETTINGS.wits_collection,
+        query={
+            'asset_id': event.asset_id,
+            'timestamp': {
+                '$gt': event.schedule_start - event.interval,
+                '$lte': event.schedule_start,
             },
-            sort={'timestamp': 1},
-            limit=1000,
-        ),
+            'metadata.drillstring': {'$exist': True, '$ne': None},
+        },
+        sort={'timestamp': 1},
+        limit=1000,
     )
+    records = pydantic.parse_obj_as(List[WitsRecord], raw_records)
 
     if not records:
         # return early if no records received
@@ -40,19 +38,17 @@ def gamma_depth(event: ScheduledEvent, api: Api, cache: Cache) -> None:
     event = GammaDepthEvent(records=records)
 
     # no exception handling. if request fails, lambda will be reinvoked.
-    drillstrings = pydantic.parse_obj_as(
-        List[Drillstring],
-        api.get_dataset(
-            provider='corva',
-            dataset=SETTINGS.drillstring_collection,
-            query={
-                'asset_id': event.asset_id,
-                '_id': {'$in': list(event.drillstring_ids)},
-            },
-            sort={'timestamp': 1},
-            limit=100,
-        ),
+    raw_drillstrings = api.get_dataset(
+        provider='corva',
+        dataset=SETTINGS.drillstring_collection,
+        query={
+            'asset_id': event.asset_id,
+            '_id': {'$in': list(event.drillstring_ids)},
+        },
+        sort={'timestamp': 1},
+        limit=100,
     )
+    drillstrings = pydantic.parse_obj_as(List[Drillstring], raw_drillstrings)
 
     id_to_drillstring = {
         drillstring.id: drillstring for drillstring in drillstrings
