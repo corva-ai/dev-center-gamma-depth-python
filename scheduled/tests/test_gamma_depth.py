@@ -1,7 +1,6 @@
 from datetime import datetime, timezone
 
 import pytest
-import requests
 from corva import Api
 from pytest_mock import MockerFixture
 from requests_mock import Mocker as RequestsMocker
@@ -35,41 +34,6 @@ def wits_record():
     }
 
 
-@pytest.mark.parametrize(
-    'raises',
-    (True, False),
-)
-def test_fail_if_records_fetch_raised(
-    raises, mocker: MockerFixture, corva_context, event, wits_record
-):
-    mock_event = mocker.patch.object(
-        GammaDepthEvent, '__init__', side_effect=Exception
-    )  # raise to return early
-
-    if raises:
-        mock_api = mocker.patch.object(
-            Api, 'get_dataset', side_effect=requests.HTTPError
-        )
-
-        pytest.raises(requests.HTTPError, lambda_handler, event, corva_context)
-
-        mock_api.assert_called_once()
-        mock_event.assert_not_called()
-
-        return
-
-    mock_api = mocker.patch.object(
-        Api,
-        'get_dataset',
-        return_value=[wits_record],
-    )
-
-    pytest.raises(Exception, lambda_handler, event, corva_context)
-
-    mock_api.assert_called_once()
-    mock_event.assert_called_once()
-
-
 @pytest.mark.parametrize('early', (True, False))
 def test_early_return_if_no_records_fetched(
     early, mocker: MockerFixture, corva_context, event, wits_record
@@ -87,29 +51,6 @@ def test_early_return_if_no_records_fetched(
     mocker.patch.object(Api, 'get_dataset', return_value=[wits_record])
     pytest.raises(Exception, lambda_handler, event, corva_context)
     mock_event.assert_called_once()
-
-
-@pytest.mark.parametrize(
-    'raises,side_effect',
-    ([True, Exception], [False, [{'_id': '', 'data': {'components': []}}]]),
-)
-def test_fail_if_drillstrings_fetch_raised(
-    raises, side_effect, mocker: MockerFixture, corva_context, event, wits_record
-):
-    mock_api = mocker.patch.object(
-        Api, 'get_dataset', side_effect=[[wits_record], side_effect]
-    )
-    mock_post = mocker.patch.object(Api, 'post')
-
-    if raises:
-        pytest.raises(side_effect, lambda_handler, event, corva_context)
-        assert mock_api.call_count == 2
-        mock_post.assert_not_called()
-        return
-
-    lambda_handler(event, corva_context)
-    assert mock_api.call_count == 2
-    mock_post.assert_called_once()
 
 
 @pytest.mark.parametrize('family', ('random', 'mwd'))
@@ -247,7 +188,6 @@ def test_fail_if_post_unsuccessful(
     event,
     wits_record,
 ):
-
     mocker.patch.object(
         Api,
         'get_dataset',
