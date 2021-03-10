@@ -25,6 +25,7 @@ class GammaDepthEvent(pydantic.BaseModel):
 
     @property
     def asset_id(self) -> int:
+        # asset id is the same among all records, that's why we fetch from the first one
         return self.records[0].asset_id
 
     @property
