@@ -9,11 +9,13 @@
   },
   "application": {
     "type": "scheduler",
-    "key": "provider.gamma-depth.scheduler",
+    "key": "provider.gamma-depth-scheduler",
     "visibility": "private",
     "name": "Gamma Depth Scheduler",
     "category": "analytics",
-    "segment": "drilling"
+    "segments": [
+      "drilling"
+    ]
   },
   "settings": {
     "entrypoint": {
@@ -29,13 +31,18 @@
   },
   "environment": {},
   "datasets": {
-    "provider.actual-gamma-depth.scheduler": {
+    "provider.actual-gamma-depth": {
       "permissions": [
         "read",
         "write"
       ]
     },
     "corva.data.drillstring": {
+      "permissions": [
+        "read"
+      ]
+    },
+    "corva.wits": {
       "permissions": [
         "read"
       ]
