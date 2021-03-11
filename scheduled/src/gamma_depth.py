@@ -24,7 +24,7 @@ def gamma_depth(event: ScheduledEvent, api: Api, cache: Cache) -> None:
                 '$gt': event.schedule_start - event.interval,
                 '$lte': event.schedule_start,
             },
-            'metadata.drillstring': {'$exist': True, '$ne': None},
+            'metadata.drillstring': {'$exists': True, '$ne': None},
         },
         sort={'timestamp': 1},
         limit=1000,
