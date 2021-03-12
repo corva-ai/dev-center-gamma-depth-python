@@ -26,7 +26,7 @@ For more details, see [Python SDK](https://github.com/corva-ai/python-sdk)
 2. Navigate to either `scheduled` or `stream` directory
 3. Create a new virtual environment: `python3 -m venv venv`
 4. Activate virtual environment: `source venv/bin/activate`
-5. Install dependencies: `pip3 install -r test_requirements.txt`
+5. Install dependencies: `pip3 install -r dev-requirements.txt`
 
 ## Run tests
 
