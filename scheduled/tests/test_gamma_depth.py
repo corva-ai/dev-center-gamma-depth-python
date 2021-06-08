@@ -1,56 +1,59 @@
-from datetime import datetime, timezone
+import contextlib
 
 import pytest
-from corva import Api
+from corva import Api, ScheduledEvent
 from pytest_mock import MockerFixture
 from requests_mock import Mocker as RequestsMocker
 
-from lambda_function import lambda_handler
 from src.configuration import SETTINGS
-from src.models import ActualGammaDepth, ActualGammaDepthData, GammaDepthEvent
+from src.gamma_depth import gamma_depth
+from src.models import (
+    ActualGammaDepth,
+    ActualGammaDepthData,
+    Drillstring,
+    DrillstringData,
+    DrillstringDataComponent,
+    GammaDepthEvent,
+    WitsRecord,
+    WitsRecordData,
+    WitsRecordMetadata,
+)
 
 
-@pytest.fixture
-def event():
-    return {
-        "schedule": 0,
-        "interval": 1,
-        "schedule_start": datetime(
-            year=2021, month=1, day=1, second=1, tzinfo=timezone.utc
-        ).timestamp()
-        * 1000,
-        "asset_id": 0,
-    }
-
-
-@pytest.fixture
-def wits_record():
-    return {
-        'asset_id': int(),
-        'company_id': int(),
-        'timestamp': int(),
-        'data': {'bit_depth': float(), 'gamma_ray': float()},
-        'metadata': {'drillstring': str()},
-    }
-
-
-@pytest.mark.parametrize('early', (True, False))
+@pytest.mark.parametrize(
+    'records,exc_ctx',
+    [
+        ([], contextlib.nullcontext()),
+        (
+            [
+                WitsRecord(
+                    asset_id=0,
+                    company_id=1,
+                    timestamp=2,
+                    data=WitsRecordData(bit_depth=3.0, gamma_ray=4.0),
+                    metadata=WitsRecordMetadata(drillstring=''),
+                ).dict(by_alias=True)
+            ],
+            pytest.raises(
+                Exception, match=r'^test_early_return_if_no_records_fetched$'
+            ),
+        ),
+    ],
+)
 def test_early_return_if_no_records_fetched(
-    early, mocker: MockerFixture, corva_context, event, wits_record
+    records, exc_ctx, mocker: MockerFixture, app_runner
 ):
-    mock_event = mocker.patch.object(
-        GammaDepthEvent, '__init__', side_effect=Exception
+    event = ScheduledEvent(asset_id=0, company_id=1, start_time=2, end_time=3)
+
+    mocker.patch.object(
+        GammaDepthEvent,
+        '__init__',
+        side_effect=Exception('test_early_return_if_no_records_fetched'),
     )  # raise to return early
+    mocker.patch.object(Api, 'get_dataset', return_value=records)
 
-    if early:
-        mocker.patch.object(Api, 'get_dataset', return_value=[])
-        lambda_handler(event, corva_context)
-        mock_event.assert_not_called()
-        return
-
-    mocker.patch.object(Api, 'get_dataset', return_value=[wits_record])
-    pytest.raises(Exception, lambda_handler, event, corva_context)
-    mock_event.assert_called_once()
+    with exc_ctx:
+        app_runner(gamma_depth, event)
 
 
 @pytest.mark.parametrize('family', ('random', 'mwd'))
@@ -61,47 +64,45 @@ def test_gamma_depth_1(
     has_gamma_sensor,
     gamma_sensor_to_bit_distance,
     mocker: MockerFixture,
-    corva_context,
-    event,
-    wits_record,
+    app_runner,
 ):
-    drillstrings = [
-        {
-            '_id': str(),
-            'data': {
-                'components': [
-                    {
-                        'family': family,
-                        'has_gamma_sensor': has_gamma_sensor,
-                        'gamma_sensor_to_bit_distance': gamma_sensor_to_bit_distance,
-                    }
-                ]
-            },
-        }
-    ]
-    expected_gamma_depth = (
-        -1.0
-        if family == 'mwd'
-        and has_gamma_sensor
-        and gamma_sensor_to_bit_distance is not None
-        else 0.0
+    wits_record = WitsRecord(
+        asset_id=0,
+        company_id=1,
+        timestamp=2,
+        data=WitsRecordData(bit_depth=3.0, gamma_ray=4.0),
+        metadata=WitsRecordMetadata(drillstring=''),
     )
 
+    drillstring = Drillstring(
+        _id='',
+        data=DrillstringData(
+            components=[
+                DrillstringDataComponent(
+                    family=family,
+                    has_gamma_sensor=has_gamma_sensor,
+                    gamma_sensor_to_bit_distance=gamma_sensor_to_bit_distance,
+                )
+            ]
+        ),
+    )
+
+    expected_gamma_depth = 2.0 if drillstring.mwd_with_gamma_sensor else 3.0
+
     _test_gamma_depth(
-        drillstrings=drillstrings,
+        drillstrings=[drillstring.dict(by_alias=True)],
         expected_gamma_depth=expected_gamma_depth,
         mocker=mocker,
-        corva_context=corva_context,
-        event=event,
-        wits_record=wits_record,
+        app_runner=app_runner,
+        wits_record=wits_record.dict(by_alias=True),
     )
 
 
 @pytest.mark.parametrize(
-    'drillstrings,expected_gamma_depth',
+    'drillstrings,mwd_with_gamma_sensor',
     (
-        ([], 0.0),
-        ([{"_id": str(), "data": {"components": []}}], 0.0),
+        ([], False),
+        ([{"_id": str(), "data": {"components": []}}], False),
         (
             [
                 {
@@ -117,7 +118,7 @@ def test_gamma_depth_1(
                     },
                 }
             ],
-            -1.0,
+            True,
         ),
     ),
     ids=(
@@ -127,20 +128,24 @@ def test_gamma_depth_1(
     ),
 )
 def test_gamma_depth_2(
-    drillstrings,
-    expected_gamma_depth,
-    mocker: MockerFixture,
-    corva_context,
-    event,
-    wits_record,
+    drillstrings, mwd_with_gamma_sensor, mocker: MockerFixture, app_runner
 ):
+    wits_record = WitsRecord(
+        asset_id=0,
+        company_id=1,
+        timestamp=2,
+        data=WitsRecordData(bit_depth=3.0, gamma_ray=4.0),
+        metadata=WitsRecordMetadata(drillstring=''),
+    )
+
+    expected_gamma_depth = 2.0 if mwd_with_gamma_sensor else 3.0
+
     _test_gamma_depth(
         drillstrings=drillstrings,
         expected_gamma_depth=expected_gamma_depth,
         mocker=mocker,
-        corva_context=corva_context,
-        event=event,
-        wits_record=wits_record,
+        app_runner=app_runner,
+        wits_record=wits_record.dict(by_alias=True),
     )
 
 
@@ -148,10 +153,11 @@ def _test_gamma_depth(
     drillstrings,
     expected_gamma_depth,
     mocker: MockerFixture,
-    corva_context,
-    event,
+    app_runner,
     wits_record,
 ):
+    event = ScheduledEvent(asset_id=0, company_id=1, start_time=2, end_time=3)
+
     mocker.patch.object(
         Api,
         'get_dataset',
@@ -159,7 +165,7 @@ def _test_gamma_depth(
     )
     post_mock = mocker.patch.object(Api, 'post')
 
-    lambda_handler(event, corva_context)
+    app_runner(gamma_depth, event)
 
     assert post_mock.call_args.kwargs['data'] == [
         ActualGammaDepth(
@@ -178,16 +184,26 @@ def _test_gamma_depth(
     ]
 
 
-@pytest.mark.parametrize('raises,status_code', ([True, 400], (False, 200)))
+@pytest.mark.parametrize(
+    'exc_ctx,status_code',
+    ([pytest.raises(Exception), 400], (contextlib.nullcontext(), 200)),
+)
 def test_fail_if_post_unsuccessful(
-    raises,
+    exc_ctx,
     status_code,
     mocker: MockerFixture,
     requests_mock: RequestsMocker,
-    corva_context,
-    event,
-    wits_record,
+    app_runner,
 ):
+    event = ScheduledEvent(asset_id=0, company_id=1, start_time=2, end_time=3)
+    wits_record = WitsRecord(
+        asset_id=0,
+        company_id=1,
+        timestamp=2,
+        data=WitsRecordData(bit_depth=3.0, gamma_ray=4.0),
+        metadata=WitsRecordMetadata(drillstring=''),
+    ).dict(by_alias=True)
+
     mocker.patch.object(
         Api,
         'get_dataset',
@@ -198,10 +214,7 @@ def test_fail_if_post_unsuccessful(
         status_code=status_code,
     )
 
-    (
-        pytest.raises(Exception, lambda_handler, event, corva_context)
-        if raises
-        else lambda_handler(event, corva_context)
-    )
+    with exc_ctx:
+        app_runner(gamma_depth, event)
 
     assert post_mock.called_once

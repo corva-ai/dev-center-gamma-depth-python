@@ -19,8 +19,8 @@
   },
   "settings": {
     "entrypoint": {
-      "file": "lambda_function",
-      "function": "lambda_handler"
+      "file": "src/gamma_depth",
+      "function": "gamma_depth"
     },
     "timeout": 120,
     "memory": 128,

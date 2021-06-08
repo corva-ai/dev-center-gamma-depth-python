@@ -1,7 +1,7 @@
 from typing import Dict, List
 
 import pydantic
-from corva import Api, Cache, ScheduledEvent
+from corva import Api, Cache, ScheduledEvent, scheduled
 
 from src.configuration import SETTINGS
 from src.models import (
@@ -13,6 +13,7 @@ from src.models import (
 )
 
 
+@scheduled
 def gamma_depth(event: ScheduledEvent, api: Api, cache: Cache) -> None:
     # no exception handling. if request fails, lambda will be reinvoked.
     raw_records = api.get_dataset(
@@ -21,8 +22,8 @@ def gamma_depth(event: ScheduledEvent, api: Api, cache: Cache) -> None:
         query={
             'asset_id': event.asset_id,
             'timestamp': {
-                '$gt': event.schedule_start - event.interval,
-                '$lte': event.schedule_start,
+                '$gte': event.start_time,
+                '$lte': event.end_time,
             },
             'metadata.drillstring': {'$exists': True, '$ne': None},
         },
