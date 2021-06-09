@@ -1,7 +1,10 @@
+srcs_comma_sep = src,tests,lambda_function.py
+comma = ,
+srcs = $(subst $(comma), ,$(srcs_comma_sep))
+
 .PHONY: test
 test:
-	@coverage run -m --branch --source=src,tests pytest tests
-
+	@coverage run -m --branch --source=$(srcs_comma_sep) pytest tests
 
 .PHONY: testcov
 testcov: test
@@ -9,7 +12,7 @@ testcov: test
 
 .PHONY: lint
 lint:
-	@flake8 --max-line-length 88 src lambda_function.py tests
+	@flake8 --max-line-length 88 $(srcs)
 
 .PHONY: clean
 clean:
