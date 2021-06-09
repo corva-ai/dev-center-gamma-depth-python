@@ -10,3 +10,11 @@ testcov: test
 .PHONY: lint
 lint:
 	@flake8 --max-line-length 88 src lambda_function.py tests
+
+.PHONY: clean
+clean:
+	@-python3 -Bc "for p in __import__('pathlib').Path('.').rglob('*.py[co]'): p.unlink()"
+	@-python3 -Bc "for p in __import__('pathlib').Path('.').rglob('__pycache__'): p.rmdir()"
+	@-rm -rf .pytest_cache
+	@-rm -rf htmlcov
+	@-rm .coverage
