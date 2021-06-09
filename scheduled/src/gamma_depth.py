@@ -58,8 +58,10 @@ def gamma_depth(event: ScheduledEvent, api: Api) -> None:
     for record in event.records:  # build actual gamma depth for each record
         gamma_depth_val = record.data.bit_depth
 
-        # the record may be tagged with a drillstring, that gets deleted before the Lambda run.
-        # data about this drillstring won't be received from the api, thus missing from the dict
+        # the record may be tagged with a drillstring,
+        # that gets deleted before the Lambda run.
+        # data about this drillstring won't be received from the api,
+        # thus missing from the dict
         drillstring = id_to_drillstring.get(record.metadata.drillstring_id)
 
         if drillstring and (mwd_with_gamma_sensor := drillstring.mwd_with_gamma_sensor):
