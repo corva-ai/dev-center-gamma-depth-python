@@ -5,8 +5,8 @@ from corva import Api, ScheduledEvent
 from pytest_mock import MockerFixture
 from requests_mock import Mocker as RequestsMocker
 
+from lambda_function import lambda_handler
 from src.configuration import SETTINGS
-from src.gamma_depth import gamma_depth
 from src.models import (
     ActualGammaDepth,
     ActualGammaDepthData,
@@ -53,7 +53,7 @@ def test_early_return_if_no_records_fetched(
     mocker.patch.object(Api, 'get_dataset', return_value=records)
 
     with exc_ctx:
-        app_runner(gamma_depth, event)
+        app_runner(lambda_handler, event)
 
 
 @pytest.mark.parametrize('family', ('random', 'mwd'))
@@ -165,7 +165,7 @@ def _test_gamma_depth(
     )
     post_mock = mocker.patch.object(Api, 'post')
 
-    app_runner(gamma_depth, event)
+    app_runner(lambda_handler, event)
 
     assert post_mock.call_args.kwargs['data'] == [
         ActualGammaDepth(
@@ -215,6 +215,6 @@ def test_fail_if_post_unsuccessful(
     )
 
     with exc_ctx:
-        app_runner(gamma_depth, event)
+        app_runner(lambda_handler, event)
 
     assert post_mock.called_once

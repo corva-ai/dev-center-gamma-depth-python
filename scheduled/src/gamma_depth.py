@@ -1,7 +1,7 @@
 from typing import Dict, List
 
 import pydantic
-from corva import Api, Cache, ScheduledEvent, scheduled
+from corva import Api, ScheduledEvent
 
 from src.configuration import SETTINGS
 from src.models import (
@@ -13,8 +13,7 @@ from src.models import (
 )
 
 
-@scheduled
-def gamma_depth(event: ScheduledEvent, api: Api, cache: Cache) -> None:
+def gamma_depth(event: ScheduledEvent, api: Api) -> None:
     # no exception handling. if request fails, lambda will be reinvoked.
     raw_records = api.get_dataset(
         provider='corva',
