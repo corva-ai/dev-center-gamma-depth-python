@@ -1,7 +1,7 @@
 from typing import Dict, List
 
 import pydantic
-from corva import Api, Cache, ScheduledEvent
+from corva import Api, ScheduledEvent
 
 from src.configuration import SETTINGS
 from src.models import (
@@ -13,7 +13,7 @@ from src.models import (
 )
 
 
-def gamma_depth(event: ScheduledEvent, api: Api, cache: Cache) -> None:
+def gamma_depth(event: ScheduledEvent, api: Api) -> None:
     # no exception handling. if request fails, lambda will be reinvoked.
     raw_records = api.get_dataset(
         provider='corva',
@@ -21,8 +21,8 @@ def gamma_depth(event: ScheduledEvent, api: Api, cache: Cache) -> None:
         query={
             'asset_id': event.asset_id,
             'timestamp': {
-                '$gt': event.schedule_start - event.interval,
-                '$lte': event.schedule_start,
+                '$gte': event.start_time,
+                '$lte': event.end_time,
             },
             'metadata.drillstring': {'$exists': True, '$ne': None},
         },
@@ -58,8 +58,10 @@ def gamma_depth(event: ScheduledEvent, api: Api, cache: Cache) -> None:
     for record in event.records:  # build actual gamma depth for each record
         gamma_depth_val = record.data.bit_depth
 
-        # the record may be tagged with a drillstring, that gets deleted before the Lambda run.
-        # data about this drillstring won't be received from the api, thus missing from the dict
+        # the record may be tagged with a drillstring,
+        # that gets deleted before the Lambda run.
+        # data about this drillstring won't be received from the api,
+        # thus missing from the dict
         drillstring = id_to_drillstring.get(record.metadata.drillstring_id)
 
         if drillstring and (mwd_with_gamma_sensor := drillstring.mwd_with_gamma_sensor):
