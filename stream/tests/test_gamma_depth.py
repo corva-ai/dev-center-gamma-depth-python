@@ -1,453 +1,236 @@
-import json
+import contextlib
 from typing import List
-from urllib.parse import urlencode, urljoin
 
-import pydantic
 import pytest
 import requests_mock as requests_mock_lib
-from corva.configuration import SETTINGS as CORVA_SETTINGS
+from corva import Api, StreamTimeEvent, StreamTimeRecord
 from pytest_mock import MockerFixture
 from requests import HTTPError
 
 from lambda_function import lambda_handler
 from src.configuration import SETTINGS
-from src.gamma_depth import get_drillstrings
-from src.models import ActualGammaDepth, ActualGammaDepthData, GammaDepthEvent
+from src.models import (
+    ActualGammaDepth,
+    ActualGammaDepthData,
+    Drillstring,
+    DrillstringData,
+    DrillstringDataComponent,
+    WitsRecordData,
+    WitsRecordMetadata,
+)
 
 
 @pytest.mark.parametrize(
-    "metadata,is_early",
-    [(None, True), ({}, True), ({"drillstring": "0"}, False)],
-    ids=["returns early", "returns early", "doesnt return early"],
+    "metadata,exc_ctx",
+    [
+        (
+            {},
+            contextlib.nullcontext(),
+        ),
+        (
+            {"drillstring": "5"},
+            pytest.raises(
+                Exception, match=r'^test_return_early_if_no_records_after_filtering$'
+            ),
+        ),
+    ],
+    ids=["returns early", "doesnt return early"],
 )
 def test_return_early_if_no_records_after_filtering(
     metadata,
-    is_early,
+    exc_ctx,
     mocker: MockerFixture,
-    requests_mock: requests_mock_lib.Mocker,
-    corva_context,
+    app_runner,
 ):
-    """tests, that records with no drillstring get deleted and app returns early, as no records left."""
-
-    event = {
-        "records": [
-            {
-                "timestamp": 0,
-                "asset_id": 0,
-                "company_id": 0,
-                "data": {"bit_depth": 0.0, "gamma_ray": 0},
-                "metadata": metadata,
-            }
-        ]
-    }
-
-    spy_filter_records = mocker.spy(GammaDepthEvent, "filter_records")
-    patch_get_drillstrings = mocker.patch(
-        "src.gamma_depth.get_drillstrings", return_value=[]
-    )
-    patch_api_post = requests_mock.post(requests_mock_lib.ANY)
-
-    lambda_handler(event, corva_context)
-
-    if is_early:
-        assert len(spy_filter_records.spy_return) == 0
-        patch_get_drillstrings.assert_not_called()
-        return
-
-    assert patch_api_post.called_once
-
-
-@pytest.mark.parametrize(
-    "raises,status_code", [(True, 404), (False, 200)], ids=["must raise", "must pass"]
-)
-def test_fail_if_couldnt_receive_drillstrings(
-    raises,
-    status_code,
-    requests_mock: requests_mock_lib.Mocker,
-    corva_context,
-):
-    event = {
-        "records": [
-            {
-                "timestamp": 0,
-                "asset_id": 0,
-                "company_id": 0,
-                "data": {"bit_depth": 0.0, "gamma_ray": 0},
-                "metadata": {"drillstring": "0"},
-            }
-        ]
-    }
-
-    requests_mock.get(requests_mock_lib.ANY, status_code=status_code, text="[]")
-    patch_api_post = requests_mock.post(requests_mock_lib.ANY)
-
-    if raises:
-        pytest.raises(HTTPError, lambda_handler, event, corva_context)
-        return
-
-    lambda_handler(event, corva_context)
-
-    assert patch_api_post.called_once
-
-
-def test_get_drillstrings_gathers_all_data(
-    mocker: MockerFixture, requests_mock: requests_mock_lib.Mocker, corva_context
-):
-    """tests, that all drillstrings received from the api, in case there is more drillstrings, than api limit"""
-
-    event = {
-        "records": [
-            {
-                "timestamp": 0,
-                "asset_id": 0,
-                "company_id": 0,
-                "data": {"bit_depth": 0.0, "gamma_ray": 0},
-                "metadata": {"drillstring": 0},
-            },
-            {
-                "timestamp": 0,
-                "asset_id": 0,
-                "company_id": 0,
-                "data": {"bit_depth": 0.0, "gamma_ray": 0},
-                "metadata": {"drillstring": 1},
-            },
-        ]
-    }
-
-    mocker.patch(
-        "src.gamma_depth.get_drillstrings",
-        lambda *args, **kwargs: get_drillstrings(
-            *args, **dict(kwargs, limit=1)
-        ),  # override limit
-    )
-
-    get_mock = requests_mock.get(
-        requests_mock_lib.ANY,
-        [
-            {"text": '[{"_id": "0", "data": {"components": []}}]'},
-            {"text": '[{"_id": "1", "data": {"components": []}}]'},
-            {"text": "[]"},
+    """Records with no drillstring get deleted and app returns early."""
+    event = StreamTimeEvent(
+        asset_id=0,
+        company_id=1,
+        records=[
+            StreamTimeRecord(
+                timestamp=2,
+                data=WitsRecordData(bit_depth=3, gamma_ray=4).dict(),
+                metadata=metadata,
+            )
         ],
     )
 
-    post_mock = requests_mock.post(requests_mock_lib.ANY)
+    mocker.patch.object(
+        Api,
+        'get_dataset',
+        side_effect=Exception('test_return_early_if_no_records_after_filtering'),
+    )
 
-    lambda_handler(event, corva_context)
-
-    assert get_mock.call_count == 3
-    for skip, req in enumerate(get_mock.request_history):
-        assert req.qs["skip"] == [f"{skip}"]
-    assert post_mock.called_once
-    assert len(post_mock.last_request.json()) == 2
+    with exc_ctx:
+        app_runner(lambda_handler, event)
 
 
-@pytest.mark.parametrize(
-    "text,expected_gamma_depth",
-    [
-        (
-            json.dumps([{"_id": "0", "data": {"components": []}}]),
-            1.0,
-        ),
-        (
-            json.dumps(
-                [
-                    {
-                        "_id": "0",
-                        "data": {
-                            "components": [
-                                {
-                                    "family": "mwd",
-                                    "has_gamma_sensor": True,
-                                    "gamma_sensor_to_bit_distance": 1.0,
-                                }
-                            ]
-                        },
-                    }
-                ]
-            ),
-            0.0,
-        ),
-        (
-            json.dumps([]),
-            1.0,
-        ),
-        (
-            json.dumps(
-                [
-                    {
-                        "_id": "0",
-                        "data": {
-                            "components": [
-                                {
-                                    "family": "random",
-                                    "has_gamma_sensor": True,
-                                    "gamma_sensor_to_bit_distance": 1.0,
-                                }
-                            ]
-                        },
-                    }
-                ]
-            ),
-            1.0,
-        ),
-    ],
-    ids=[
-        "no_mwd_with_gamma_sensor",
-        "mwd_with_gamma_sensor",
-        "missing_drillstring_data_from_api",
-        "family not mwd",
-    ],
-)
-def test_gamma_depth(
-    text, expected_gamma_depth, requests_mock: requests_mock_lib.Mocker, corva_context
+@pytest.mark.parametrize('family', ('random', 'mwd'))
+@pytest.mark.parametrize('has_gamma_sensor', (None, True, False))
+@pytest.mark.parametrize('gamma_sensor_to_bit_distance', (None, 1.0))
+def test_gamma_depth_1(
+    family,
+    has_gamma_sensor,
+    gamma_sensor_to_bit_distance,
+    mocker: MockerFixture,
+    app_runner,
 ):
-    event = {
-        "records": [
-            {
-                "timestamp": 0,
-                "asset_id": 0,
-                "company_id": 0,
-                "data": {"bit_depth": 1.0, "gamma_ray": 2},
-                "metadata": {"drillstring": "0"},
-            }
-        ]
-    }
-
-    expected = ActualGammaDepth(
+    event = StreamTimeEvent(
         asset_id=0,
-        collection=SETTINGS.actual_gamma_depth_collection,
-        company_id=0,
-        data=ActualGammaDepthData(
-            gamma_depth=expected_gamma_depth, bit_depth=1.0, gamma_ray=2
+        company_id=1,
+        records=[
+            StreamTimeRecord(
+                timestamp=2,
+                data=WitsRecordData(bit_depth=3, gamma_ray=4).dict(),
+                metadata=WitsRecordMetadata(drillstring='5').dict(by_alias=True),
+            )
+        ],
+    )
+
+    drillstring = Drillstring(
+        _id='5',
+        data=DrillstringData(
+            components=[
+                DrillstringDataComponent(
+                    family=family,
+                    has_gamma_sensor=has_gamma_sensor,
+                    gamma_sensor_to_bit_distance=gamma_sensor_to_bit_distance,
+                )
+            ]
         ),
-        provider=SETTINGS.provider,
-        timestamp=0,
-        version=SETTINGS.version,
     )
 
-    get_mock = requests_mock.get(
-        urljoin(
-            CORVA_SETTINGS.DATA_API_ROOT_URL,
-            "api/v1/data/corva/%s/?%s"
-            % (
-                SETTINGS.drillstring_collection,
-                urlencode(
-                    {
-                        "query": '{"asset_id": 0, "_id": {"$in": ["0"]}}',
-                        "sort": '{"timestamp": 1}',
-                        "limit": 100,
-                        "skip": 0,
-                        "fields": "_id,data",
-                    }
-                ),
-            ),
-        ),
-        text=text,
+    expected_gamma_depth = 2.0 if drillstring.mwd_with_gamma_sensor else 3.0
+
+    _test_gamma_depth(
+        event=event,
+        drillstrings=[drillstring.dict(by_alias=True)],
+        expected_gamma_depth=expected_gamma_depth,
+        mocker=mocker,
+        app_runner=app_runner,
     )
-
-    post_mock = requests_mock.post(
-        urljoin(
-            CORVA_SETTINGS.DATA_API_ROOT_URL,
-            f"api/v1/data/{SETTINGS.provider}/{SETTINGS.actual_gamma_depth_collection}/",
-        )
-    )
-
-    lambda_handler(event, corva_context)
-
-    assert get_mock.called
-    assert post_mock.called_once
-
-    actual_gamma_depths = pydantic.parse_obj_as(
-        List[ActualGammaDepth], post_mock.last_request.json()
-    )  # type: List[ActualGammaDepth]
-
-    assert actual_gamma_depths[0] == expected
 
 
 @pytest.mark.parametrize(
-    "components,expected_gamma_depth",
-    [
+    'drillstrings,mwd_with_gamma_sensor',
+    (
+        ([], False),
+        ([{"_id": '5', "data": {"components": []}}], False),
         (
             [
                 {
-                    "family": "random",
-                    "has_gamma_sensor": None,
-                    "gamma_sensor_to_bit_distance": None,
+                    "_id": '5',
+                    "data": {
+                        "components": [
+                            {
+                                "family": "mwd",
+                                "has_gamma_sensor": True,
+                                "gamma_sensor_to_bit_distance": 1.0,
+                            }
+                        ]
+                    },
                 }
             ],
-            1.0,
+            True,
         ),
-        (
-            [
-                {
-                    "family": "random",
-                    "has_gamma_sensor": None,
-                    "gamma_sensor_to_bit_distance": 1.0,
-                }
-            ],
-            1.0,
-        ),
-        (
-            [
-                {
-                    "family": "random",
-                    "has_gamma_sensor": True,
-                    "gamma_sensor_to_bit_distance": None,
-                }
-            ],
-            1.0,
-        ),
-        (
-            [
-                {
-                    "family": "random",
-                    "has_gamma_sensor": True,
-                    "gamma_sensor_to_bit_distance": 1.0,
-                }
-            ],
-            1.0,
-        ),
-        (
-            [
-                {
-                    "family": "mwd",
-                    "has_gamma_sensor": None,
-                    "gamma_sensor_to_bit_distance": None,
-                }
-            ],
-            1.0,
-        ),
-        (
-            [
-                {
-                    "family": "mwd",
-                    "has_gamma_sensor": None,
-                    "gamma_sensor_to_bit_distance": 1.0,
-                }
-            ],
-            1.0,
-        ),
-        (
-            [
-                {
-                    "family": "mwd",
-                    "has_gamma_sensor": True,
-                    "gamma_sensor_to_bit_distance": None,
-                }
-            ],
-            1.0,
-        ),
-        (
-            [
-                {
-                    "family": "mwd",
-                    "has_gamma_sensor": True,
-                    "gamma_sensor_to_bit_distance": 1.0,
-                }
-            ],
-            0.0,
-        ),
-        (
-            [
-                {
-                    "family": "mwd",
-                    "has_gamma_sensor": True,
-                    "gamma_sensor_to_bit_distance": None,
-                },
-                {
-                    "family": "mwd",
-                    "has_gamma_sensor": True,
-                    "gamma_sensor_to_bit_distance": 1.0,
-                },
-            ],
-            0.0,
-        ),
-    ],
-    ids=[
-        "wrong component",
-        "wrong component",
-        "wrong component",
-        "wrong component",
-        "wrong component",
-        "wrong component",
-        "wrong component",
-        "correct component",
-        "one wrong, one correct component",
-    ],
+    ),
+    ids=(
+        "drillstring data was not received from api",
+        "drillstring has empty components",
+        "drillstring has mwd with gamma sensor",
+    ),
 )
-def test_drillstrings_are_filtered(
-    components,
-    expected_gamma_depth,
-    requests_mock: requests_mock_lib.Mocker,
-    corva_context,
+def test_gamma_depth_2(
+    drillstrings, mwd_with_gamma_sensor, mocker: MockerFixture, app_runner
 ):
-    event = {
-        "records": [
-            {
-                "timestamp": 0,
-                "asset_id": 0,
-                "company_id": 0,
-                "data": {"bit_depth": 1.0, "gamma_ray": 2},
-                "metadata": {"drillstring": "0"},
-            }
-        ]
-    }
-
-    text = json.dumps([{"_id": "0", "data": {"components": components}}])
-    expected = ActualGammaDepth(
+    event = StreamTimeEvent(
         asset_id=0,
-        collection=SETTINGS.actual_gamma_depth_collection,
-        company_id=0,
-        data=ActualGammaDepthData(
-            gamma_depth=expected_gamma_depth, bit_depth=1.0, gamma_ray=2
-        ),
-        provider=SETTINGS.provider,
-        timestamp=0,
-        version=SETTINGS.version,
+        company_id=1,
+        records=[
+            StreamTimeRecord(
+                timestamp=2,
+                data=WitsRecordData(bit_depth=3, gamma_ray=4).dict(),
+                metadata=WitsRecordMetadata(drillstring='5').dict(by_alias=True),
+            )
+        ],
     )
 
-    get_mock = requests_mock.get(requests_mock_lib.ANY, text=text)
+    expected_gamma_depth = 2.0 if mwd_with_gamma_sensor else 3.0
 
-    post_mock = requests_mock.post(requests_mock_lib.ANY)
+    _test_gamma_depth(
+        event=event,
+        drillstrings=drillstrings,
+        expected_gamma_depth=expected_gamma_depth,
+        mocker=mocker,
+        app_runner=app_runner,
+    )
 
-    lambda_handler(event, corva_context)
 
-    assert get_mock.called_once
-    assert post_mock.called_once
+def _test_gamma_depth(
+    event: StreamTimeEvent,
+    drillstrings: List[dict],
+    expected_gamma_depth: float,
+    mocker: MockerFixture,
+    app_runner,
+):
+    mocker.patch.object(
+        Api,
+        'get_dataset',
+        return_value=drillstrings,
+    )
+    post_mock = mocker.patch.object(Api, 'post')
 
-    actual_gamma_depths = pydantic.parse_obj_as(
-        List[ActualGammaDepth], post_mock.last_request.json()
-    )  # type: List[ActualGammaDepth]
+    app_runner(lambda_handler, event)
 
-    assert len(actual_gamma_depths) == 1
-    assert actual_gamma_depths[0] == expected
+    assert post_mock.call_args.kwargs['data'] == [
+        ActualGammaDepth(
+            asset_id=event.asset_id,
+            collection=SETTINGS.actual_gamma_depth_collection,
+            company_id=event.company_id,
+            data=ActualGammaDepthData(
+                gamma_depth=expected_gamma_depth,
+                bit_depth=event.records[0].data['bit_depth'],
+                gamma_ray=event.records[0].data['gamma_ray'],
+            ),
+            provider=SETTINGS.provider,
+            timestamp=event.records[0].timestamp,
+            version=SETTINGS.version,
+        ).dict()
+    ]
 
 
 @pytest.mark.parametrize(
-    "raises,status_code", [(True, 404), (False, 200)], ids=["must raise", "must pass"]
+    "exc_ctx,status_code",
+    [(pytest.raises(HTTPError), 404), (contextlib.nullcontext(), 200)],
+    ids=["must raise", "must pass"],
 )
 def test_fail_if_couldnt_post(
-    raises, status_code, requests_mock: requests_mock_lib.Mocker, corva_context
+    exc_ctx,
+    status_code,
+    mocker: MockerFixture,
+    requests_mock: requests_mock_lib.Mocker,
+    app_runner,
 ):
-    event = {
-        "records": [
-            {
-                "timestamp": 0,
-                "asset_id": 0,
-                "company_id": 0,
-                "data": {"bit_depth": 0.0, "gamma_ray": 0},
-                "metadata": {"drillstring": "0"},
-            }
-        ]
-    }
+    event = StreamTimeEvent(
+        asset_id=0,
+        company_id=1,
+        records=[
+            StreamTimeRecord(
+                timestamp=2,
+                data=WitsRecordData(bit_depth=3, gamma_ray=4).dict(),
+                metadata=WitsRecordMetadata(drillstring='5').dict(by_alias=True),
+            )
+        ],
+    )
 
-    requests_mock.get(requests_mock_lib.ANY, text="[]")
-    patch_api_post = requests_mock.post(requests_mock_lib.ANY, status_code=status_code)
+    mocker.patch.object(
+        Api,
+        'get_dataset',
+        return_value=[],
+    )
+    post_mock = requests_mock.post(requests_mock_lib.ANY, status_code=status_code)
 
-    if raises:
-        pytest.raises(HTTPError, lambda_handler, event, corva_context)
-        return
+    with exc_ctx:
+        app_runner(lambda_handler, event)
 
-    lambda_handler(event, corva_context)
-
-    assert patch_api_post.called_once
+    assert post_mock.called_once
