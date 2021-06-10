@@ -1,8 +1,8 @@
-from corva import Corva
+from corva import Api, Cache, StreamTimeEvent, stream
 
 from src.gamma_depth import gamma_depth
 
 
-def lambda_handler(event, context):
-    corva = Corva(context=context)
-    corva.stream(gamma_depth, event, filter_mode='timestamp')
+@stream
+def lambda_handler(event: StreamTimeEvent, api: Api, cache: Cache) -> None:
+    gamma_depth(event=event, api=api)

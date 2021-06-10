@@ -4,6 +4,7 @@ import copy
 from typing import List, Optional, Set
 
 import pydantic
+from corva import StreamTimeEvent, StreamTimeRecord
 
 
 class WitsRecordMetadata(pydantic.BaseModel):
@@ -15,20 +16,13 @@ class WitsRecordData(pydantic.BaseModel):
     gamma_ray: float
 
 
-class WitsRecord(pydantic.BaseModel):
-    asset_id: int
-    company_id: int
-    timestamp: int
+class WitsRecord(StreamTimeRecord):
     data: WitsRecordData
-    metadata: Optional[WitsRecordMetadata] = None
+    metadata: WitsRecordMetadata
 
 
-class GammaDepthEvent(pydantic.BaseModel):
+class GammaDepthEvent(StreamTimeEvent):
     records: pydantic.conlist(WitsRecord, min_items=1)
-
-    @property
-    def asset_id(self) -> int:
-        return self.records[0].asset_id
 
     @staticmethod
     def filter_records(event: GammaDepthEvent) -> List[WitsRecord]:
@@ -37,7 +31,7 @@ class GammaDepthEvent(pydantic.BaseModel):
         new_records = [
             copy.deepcopy(record)
             for record in event.records
-            if record.metadata and record.metadata.drillstring_id
+            if record.metadata.drillstring_id
         ]
 
         return new_records
@@ -60,6 +54,14 @@ class DrillstringDataComponent(pydantic.BaseModel):
     gamma_sensor_to_bit_distance: Optional[float]
     has_gamma_sensor: Optional[bool] = False
 
+    @property
+    def is_mwd_with_gamma_sensor(self):
+        return (
+            self.family == 'mwd'
+            and self.has_gamma_sensor
+            and self.gamma_sensor_to_bit_distance is not None
+        )
+
 
 class DrillstringData(pydantic.BaseModel):
     components: List[DrillstringDataComponent]
@@ -71,28 +73,12 @@ class Drillstring(pydantic.BaseModel):
     id: str = pydantic.Field(..., alias="_id")
     data: DrillstringData
 
-    @classmethod
-    def filter(cls, drillstring: Drillstring) -> Drillstring:
-        new_components = [
-            copy.deepcopy(component)
-            for component in drillstring.data.components
-            if component.gamma_sensor_to_bit_distance is not None
-            and component.has_gamma_sensor is not None
-            and component.family == "mwd"
-        ]
-
-        result = drillstring.copy(
-            update={"data": DrillstringData(components=new_components)}, deep=True
-        )
-
-        return result
-
     @property
     def mwd_with_gamma_sensor(self) -> Optional[DrillstringDataComponent]:
         """returns MWD component with a gamma sensor"""
 
         for component in self.data.components:
-            if component.family == "mwd" and component.has_gamma_sensor:
+            if component.is_mwd_with_gamma_sensor:
                 return component
 
         return None
